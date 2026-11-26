@@ -9,6 +9,7 @@ export interface Match {
 export interface Pick { fixtureId: string; selection: '1' | 'X' | '2'; priceMilli: number; pickName: string; game: string }
 export interface Me {
   user: { id: string; phone: string; firstName: string; lastName: string; role: string; kycStatus: string; balanceCents: number } | null;
+  paymentsEnabled: boolean; minDepositCents: number; minWithdrawalCents: number;
   demoMode: boolean; liveBetting: boolean; minStakeCents: number; maxStakeCents: number;
 }
 

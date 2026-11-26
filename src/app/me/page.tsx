@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { api, useApp } from '../store';
 import { formatNad } from '@/lib/money';
+import { WalletPanel } from './wallet';
 
 export default function Me() {
   const { me, refreshMe } = useApp();
@@ -28,11 +29,13 @@ export default function Me() {
             <div className="quick">{[100, 500, 1000].map((n) => <button key={n} onClick={() => topUp(n)}>+ N$ {n}</button>)}</div>
             <p className="muted" style={{ fontSize: 11, margin: '8px 0 0' }}>Demo mode: play money only. Real deposits need the payment integration.</p>
           </>
-        ) : <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>Deposits and withdrawals are coming soon.</p>}
+        ) : null}
         {msg && <p className="green" style={{ fontSize: 13 }}>{msg}</p>}
       </div>
+      <WalletPanel />
       <div className="menu" style={{ margin: '0 16px', borderTop: '1px solid var(--line)' }}>
         {u.role === 'admin' && <Link href="/admin">Admin: results &amp; settlement <span className="muted">›</span></Link>}
+        {u.role === 'admin' && <Link href="/admin/withdrawals">Admin: withdrawals <span className="muted">›</span></Link>}
         <button onClick={logout}>Log out <span className="muted">›</span></button>
       </div>
       <div className="note">18+ · Gamble responsibly · Licensed in Namibia</div>

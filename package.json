@@ -8,7 +8,8 @@
     "start": "next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "sandbox:webhook": "tsx --env-file=.env scripts/sandbox-webhook.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.6.0",

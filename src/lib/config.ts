@@ -16,6 +16,10 @@ export const config = {
   apiFootballKey: process.env.API_FOOTBALL_KEY ?? '',
   apiFootballLeagues: (process.env.API_FOOTBALL_LEAGUES ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   apiFootballBookmaker: process.env.API_FOOTBALL_BOOKMAKER ?? '8',
+  minDepositCents: num(process.env.MIN_DEPOSIT_CENTS, 1_000),
+  maxDepositCents: num(process.env.MAX_DEPOSIT_CENTS, 500_000),
+  minWithdrawalCents: num(process.env.MIN_WITHDRAWAL_CENTS, 5_000),
+  maxWithdrawalCents: num(process.env.MAX_WITHDRAWAL_CENTS, 2_000_000),
 };
 
 export function authSecret(): string {

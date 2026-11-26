@@ -2,13 +2,16 @@ import { handle, ok } from '@/lib/http';
 import { getSession } from '@/lib/auth';
 import { getDb } from '@/lib/db';
 import { config } from '@/lib/config';
+import { getPaymentProvider } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return handle(async () => {
     const s = await getSession();
-    const flags = { demoMode: config.demoMode, liveBetting: config.liveBetting, minStakeCents: config.minStakeCents, maxStakeCents: config.maxStakeCents };
+    let paymentsEnabled = false;
+    try { paymentsEnabled = !!getPaymentProvider(); } catch { /* misconfigured = off */ }
+    const flags = { paymentsEnabled, minDepositCents: config.minDepositCents, minWithdrawalCents: config.minWithdrawalCents, demoMode: config.demoMode, liveBetting: config.liveBetting, minStakeCents: config.minStakeCents, maxStakeCents: config.maxStakeCents };
     if (!s) return ok({ user: null, ...flags });
     const db = await getDb();
     const r = await db.q<any>(

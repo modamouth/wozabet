@@ -1,16 +1,19 @@
 import type { Db, Q } from './db';
 import { AppError } from './errors';
 
-export type LedgerType = 'deposit' | 'withdrawal' | 'bet_stake' | 'bet_win' | 'bet_refund' | 'bonus';
+export type LedgerType = 'deposit' | 'withdrawal' | 'withdrawal_reversal' | 'bet_stake' | 'bet_win' | 'bet_refund' | 'bonus';
+
+async function assertNewRef(q: Q, type: LedgerType, ref?: string) {
+  if (!ref) return;
+  // idempotency: check BEFORE touching the balance (the unique index is the backstop for races)
+  const dupe = await q('SELECT 1 FROM ledger WHERE type=$1 AND ref=$2', [type, ref]);
+  if (dupe.length) throw new AppError('duplicate_ref', 'This transaction was already processed', 409);
+}
 
 /** Add money. `ref` makes the entry idempotent (same type+ref can only be booked once). */
 export async function credit(q: Q, userId: string, cents: number, type: LedgerType, ref?: string): Promise<number> {
   if (!Number.isInteger(cents) || cents <= 0) throw new AppError('bad_amount', 'Amount must be a positive whole number of cents');
-  if (ref) {
-    // idempotency: check BEFORE touching the balance (the unique index is the backstop for races)
-    const dupe = await q('SELECT 1 FROM ledger WHERE type=$1 AND ref=$2', [type, ref]);
-    if (dupe.length) throw new AppError('duplicate_ref', 'This transaction was already processed', 409);
-  }
+  await assertNewRef(q, type, ref);
   const rows = await q<{ balance_cents: number }>(
     'UPDATE wallets SET balance_cents = balance_cents + $2 WHERE user_id = $1 RETURNING balance_cents',
     [userId, cents],
@@ -25,6 +28,7 @@ export async function credit(q: Q, userId: string, cents: number, type: LedgerTy
 /** Remove money atomically; fails (without going negative) if funds are insufficient. */
 export async function debit(q: Q, userId: string, cents: number, type: LedgerType, ref?: string): Promise<number> {
   if (!Number.isInteger(cents) || cents <= 0) throw new AppError('bad_amount', 'Amount must be a positive whole number of cents');
+  await assertNewRef(q, type, ref);
   const rows = await q<{ balance_cents: number }>(
     'UPDATE wallets SET balance_cents = balance_cents - $2 WHERE user_id = $1 AND balance_cents >= $2 RETURNING balance_cents',
     [userId, cents],
@@ -43,4 +47,7 @@ export async function getBalance(q: Q, userId: string): Promise<number> {
 
 /** Book a deposit (e.g. from a payment webhook) atomically and idempotently by the provider's reference. */
 export const deposit = (db: Db, userId: string, cents: number, ref: string) =>
-  db.tx((q) => credit(q, userId, cents, 'deposit', ref));
+  db.tx((q) => depositInTx(q, userId, cents, ref));
+
+/** Same as deposit(), for callers that already hold a transaction (e.g. the payment webhook, which also updates the payment row). */
+export const depositInTx = (q: Q, userId: string, cents: number, ref: string) => credit(q, userId, cents, 'deposit', ref);

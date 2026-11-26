@@ -72,4 +72,31 @@ CREATE TABLE IF NOT EXISTS bet_legs (
 );
 CREATE INDEX IF NOT EXISTS bet_legs_fixture_idx ON bet_legs(fixture_id, status);
 CREATE INDEX IF NOT EXISTS bet_legs_bet_idx ON bet_legs(bet_id);
+CREATE TABLE IF NOT EXISTS payments (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id),
+  provider text NOT NULL,
+  amount_cents integer NOT NULL CHECK (amount_cents > 0),
+  msisdn text NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  provider_ref text,
+  failure_reason text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payments_user_idx ON payments(user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS payments_provider_ref_uq ON payments(provider, provider_ref) WHERE provider_ref IS NOT NULL;
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id),
+  amount_cents integer NOT NULL CHECK (amount_cents > 0),
+  msisdn text NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  reviewed_by text REFERENCES users(id),
+  reviewed_at timestamptz,
+  reason text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS withdrawals_status_idx ON withdrawals(status, created_at);
+CREATE INDEX IF NOT EXISTS withdrawals_user_idx ON withdrawals(user_id, created_at DESC);
 `;
