@@ -13,8 +13,10 @@ export const config = {
   liveBetting: bool(process.env.LIVE_BETTING, false),
   autoSettle: bool(process.env.AUTO_SETTLE, false),
   demoMode: bool(process.env.DEMO_MODE, false),
-  /** Fake fixtures for development. Never on in production unless explicitly forced (e.g. a staging demo). */
-  mockFeed: bool(process.env.MOCK_FEED, process.env.NODE_ENV !== 'production'),
+  /** Fake fixtures for development with the embedded database. Never on in production unless explicitly forced. */
+  // …and off by default whenever a real database is configured, so a dev machine pointed at a shared/production
+  // database (e.g. via a pulled .env.local) can never write fake fixtures into it.
+  mockFeed: bool(process.env.MOCK_FEED, process.env.NODE_ENV !== 'production' && !process.env.DATABASE_URL),
   apiFootballKey: process.env.API_FOOTBALL_KEY ?? '',
   apiFootballLeagues: (process.env.API_FOOTBALL_LEAGUES ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   apiFootballBookmaker: process.env.API_FOOTBALL_BOOKMAKER ?? '8',

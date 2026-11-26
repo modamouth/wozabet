@@ -221,3 +221,19 @@ describe('feed selection', () => {
     expect(defaultProviders().map((p) => p.name)).toEqual(['api-football']);
   });
 });
+
+describe('mock feed default', () => {
+  const env = { ...process.env };
+  afterEach(() => { process.env = { ...env }; });
+  const load = async () => { const { vi } = await import('vitest'); vi.resetModules(); return (await import('@/lib/config')).config.mockFeed; };
+  it('is on only for development with the embedded database', async () => {
+    Object.assign(process.env, { NODE_ENV: 'development', DATABASE_URL: '', MOCK_FEED: '' });
+    expect(await load()).toBe(true);
+    Object.assign(process.env, { NODE_ENV: 'development', DATABASE_URL: 'postgres://u:p@prod.example/db' });
+    expect(await load()).toBe(false); // a dev box pointed at a real database must never write fake fixtures
+    Object.assign(process.env, { NODE_ENV: 'production', DATABASE_URL: '' });
+    expect(await load()).toBe(false);
+    Object.assign(process.env, { NODE_ENV: 'development', DATABASE_URL: 'postgres://u:p@prod.example/db', MOCK_FEED: 'true' });
+    expect(await load()).toBe(true); // explicit opt-in still possible
+  });
+});
