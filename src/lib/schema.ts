@@ -42,12 +42,13 @@ CREATE TABLE IF NOT EXISTS fixtures (
 CREATE INDEX IF NOT EXISTS fixtures_status_idx ON fixtures(status, kickoff);
 CREATE TABLE IF NOT EXISTS odds (
   fixture_id text NOT NULL REFERENCES fixtures(id) ON DELETE CASCADE,
+  market text NOT NULL DEFAULT '1x2',
   selection text NOT NULL,
   source_milli integer NOT NULL,
   price_milli integer NOT NULL,
   suspended boolean NOT NULL DEFAULT false,
   updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (fixture_id, selection)
+  PRIMARY KEY (fixture_id, market, selection)
 );
 CREATE TABLE IF NOT EXISTS bets (
   id text PRIMARY KEY,
@@ -171,4 +172,14 @@ BEGIN RAISE EXCEPTION 'audit_log is append-only'; END $$;
 DROP TRIGGER IF EXISTS audit_log_no_change ON audit_log;
 CREATE TRIGGER audit_log_no_change BEFORE UPDATE OR DELETE ON audit_log FOR EACH ROW EXECUTE FUNCTION audit_log_immutable();
 ALTER TABLE odds ADD COLUMN IF NOT EXISTS source_updated_at timestamptz;
+-- markets (step 6): databases created before markets existed get the column and the wider primary key
+ALTER TABLE odds ADD COLUMN IF NOT EXISTS market text NOT NULL DEFAULT '1x2';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                  WHERE i.indrelid = 'odds'::regclass AND i.indisprimary AND a.attname = 'market') THEN
+    ALTER TABLE odds DROP CONSTRAINT odds_pkey;
+    ALTER TABLE odds ADD PRIMARY KEY (fixture_id, market, selection);
+  END IF;
+END $$;
+ALTER TABLE bet_legs ADD COLUMN IF NOT EXISTS market text NOT NULL DEFAULT '1x2';
 `;

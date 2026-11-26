@@ -7,6 +7,7 @@ Mobile-first Next.js app + betting backend. Runs out of the box with **fake data
 ```bash
 npm install
 cp .env.example .env          # edit secrets; leave API_FOOTBALL_KEY empty for fake data
+                              # with a key set there is no sample data: run Me → Admin → "Sync odds & fixtures now" (or POST /api/cron/sync)
 npm run seed                  # creates the admin user + sample fixtures
 npm run dev                   # http://localhost:3000
 npm test                      # odds, settlement, wallet, bets, payments, withdrawals
@@ -23,7 +24,8 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 | Reference odds -> **your** prices (strip their margin, add yours, round down) | `src/lib/odds.ts` (`MARGIN` in `.env`) |
 | Wallet + append-only ledger, idempotent by reference | `src/lib/wallet.ts` |
 | Bet placement: stake limits, price-change check, funds, max payout, self-exclusion | `src/lib/bets.ts` |
-| Settlement (1X2, two-way, accumulators, void/cancel), idempotent | `src/lib/settle.ts`, `settle-logic.ts` |
+| Markets: match result, double chance, over/under 2.5, both teams to score (football, 90 minutes) | `src/lib/markets.ts` |
+| Settlement (all markets, accumulators, void/cancel), idempotent | `src/lib/settle.ts`, `settle-logic.ts` |
 | Odds/fixtures feed: API-Football + mock | `src/lib/providers/`, `sync.ts` |
 | Mobile-wallet deposits (initiate + HMAC-signed webhook), withdrawals with admin review | `src/lib/payments/`, `withdrawals.ts` |
 | KYC: ID number + document upload to private S3-compatible storage, admin review | `src/lib/kyc.ts`, `storage.ts` |
@@ -36,7 +38,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 
 1. **Postgres**: set `DATABASE_URL` (tables are created automatically). Dev uses embedded Postgres (PGlite) in `./.data`.
 2. **Secrets**: set `AUTH_SECRET` and `CRON_SECRET` (the app refuses to start in production without `AUTH_SECRET`). Set `DEMO_MODE=false`.
-3. **Real odds**: set `API_FOOTBALL_KEY` and `API_FOOTBALL_LEAGUES`, then schedule `POST /api/cron/sync` with the header `Authorization: Bearer $CRON_SECRET`. See [Odds feed](#odds-feed) for the plan you need and how often to sync. Rugby and basketball only exist in the mock feed.
+3. **Real odds**: set `API_FOOTBALL_KEY` and `API_FOOTBALL_LEAGUES`, then schedule `POST /api/cron/sync` with the header `Authorization: Bearer $CRON_SECRET`. See [Odds feed](#odds-feed) for the plan you need and how often to sync. Football only: rugby and basketball were removed until a real data source is contracted.
 4. **Payments**: see [Payments](#payments) below. The mobile-wallet adapter's API details are assumptions until checked against your provider's merchant docs.
 5. **Compliance**: KYC and responsible-gambling tools are built (see below). Still to do: bonus wagering rules, audit/reporting for the Namibia Gambling Board, terms and privacy pages. Have your gambling lawyer review before taking real money.
 6. **Settlement**: keep `AUTO_SETTLE=false` at first (admin confirms results by hand); enable once you trust the feed.
@@ -59,6 +61,21 @@ What the live check showed:
 **Stale-odds protection.** Prices go suspended when we haven't refreshed them for `ODDS_MAX_AGE_MINUTES` (the feed is down or sync isn't running), or when the provider hasn't changed them for `ODDS_MAX_SOURCE_AGE_MINUTES` (the feed is frozen upstream). The check runs in SQL both when matches are listed **and** when a bet is placed, so a stale price is never bettable even if no job has run. Each sync also writes the suspension to the database (recorded in the audit log as `odds.suspended_stale`), and fresh prices lift it.
 
 **Exposure limit.** `MAX_MARKET_LIABILITY_CENTS` caps the worst-case loss on one market across all players: the payout if a selection wins, minus single-bet stakes held on that market. Accumulator legs count their full potential return. A bet over the limit gets `market_limit`. Bets lock the fixture rows involved, so parallel bets can't slip past the limit together.
+
+## Markets
+
+| Market | Selections | Wins when (90-minute score) |
+|---|---|---|
+| Match result `1x2` | 1 / X / 2 | home win / draw / away win |
+| Double chance `dc` | 1X / 12 / X2 | either of the two outcomes |
+| Over/under 2.5 `ou25` | O / U | 3+ goals / 0–2 goals |
+| Both teams to score `btts` | Y / N | each side scores at least once / not |
+
+- Everything settles on **regular time**. For AET/PEN matches the adapter takes `score.fulltime` rather than `goals`, which includes extra time. A cancelled or abandoned match voids every leg.
+- The margin is applied per market. Double chance is normalised to a 200% book because each outcome is covered by two selections.
+- Prices come from API-Football bets 1, 12, 5 and 8 (ids checked live). A market is only offered when the provider sends every one of its selections.
+- The exposure limit is per market: fixture + market + selection.
+- Unknown market/selection pairs are refused at placement, and voided rather than guessed at settlement.
 
 ## Payments
 
@@ -114,4 +131,4 @@ Players on a cool-off or self-exclusion can still log in and **withdraw** their 
 
 ## Known limits of this MVP
 - Sessions are 30-day signed cookies with no server-side revocation list yet. Changing the password doesn't sign out other devices.
-- Only 1X2 / two-way match-winner markets, singles and accumulators.
+- Singles and accumulators only (no system bets or bet builder). One pick per match in an accumulator, because outcomes on the same match are correlated.

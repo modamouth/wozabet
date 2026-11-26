@@ -38,14 +38,12 @@ export async function settleFixture(db: Db, fixtureId: string) {
 
 async function settleLocked(q: Q, fixtureId: string) {
   const fx = (await q<any>('SELECT * FROM fixtures WHERE id=$1', [fixtureId]))[0];
-  const odds = await q<{ selection: string }>('SELECT selection FROM odds WHERE fixture_id=$1', [fixtureId]);
-  const hasDraw = odds.some((o) => o.selection === 'X');
-  const result = { status: fx.status as FixtureStatus, homeScore: fx.home_score, awayScore: fx.away_score, hasDraw };
+  const result = { status: fx.status as FixtureStatus, homeScore: fx.home_score, awayScore: fx.away_score };
 
-  const legs = await q<{ id: number; bet_id: string; selection: string }>(
-    "SELECT id, bet_id, selection FROM bet_legs WHERE fixture_id=$1 AND status='open'", [fixtureId]);
+  const legs = await q<{ id: number; bet_id: string; market: string; selection: string }>(
+    "SELECT id, bet_id, market, selection FROM bet_legs WHERE fixture_id=$1 AND status='open'", [fixtureId]);
   for (const l of legs) {
-    const st = legOutcome(l.selection, result);
+    const st = legOutcome(l.market, l.selection, result);
     if (st !== 'open') await q('UPDATE bet_legs SET status=$2 WHERE id=$1', [l.id, st]);
   }
 

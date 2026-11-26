@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { ApiError, api, useApp } from './store';
-import { formatNad, formatOdds } from '@/lib/money';
+import { formatNad, formatOdds, parseNadToCents } from '@/lib/money';
 import { potentialReturnCents, totalOddsMilli } from '@/lib/odds';
 
 export default function BetSlip() {
@@ -15,7 +15,7 @@ export default function BetSlip() {
   if (!slipOpen) return null;
 
   const list = Object.values(picks);
-  const stakeCents = Math.round((parseFloat(stake.replace(',', '.')) || 0) * 100);
+  const stakeCents = parseNadToCents(stake) ?? 0;
   const total = totalOddsMilli(list.map((p) => p.priceMilli));
   const ret = potentialReturnCents(stakeCents, total);
   const close = () => { setSlipOpen(false); setPlaced(null); setNotice(''); setError(''); };
@@ -24,7 +24,7 @@ export default function BetSlip() {
     setBusy(true); setError(''); setNotice('');
     try {
       const r = await api<{ bet: { potentialReturnCents: number } }>('/api/bets', {
-        json: { stakeCents, selections: list.map((p) => ({ fixtureId: p.fixtureId, selection: p.selection, priceMilli: p.priceMilli })) },
+        json: { stakeCents, selections: list.map((p) => ({ fixtureId: p.fixtureId, market: p.market, selection: p.selection, priceMilli: p.priceMilli })) },
       });
       setPlaced(r.bet.potentialReturnCents);
       clear();

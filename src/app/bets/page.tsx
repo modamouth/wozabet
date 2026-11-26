@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { api, useApp } from '../store';
 import { formatNad, formatOdds } from '@/lib/money';
 
-interface Leg { selection: string; priceMilli: number; status: string; home: string; away: string }
+interface Leg { market: string; selection: string; label: string; priceMilli: number; status: string; home: string; away: string; homeScore: number | null; awayScore: number | null }
 interface Bet { id: string; kind: string; status: string; stakeCents: number; totalOddsMilli: number; potentialReturnCents: number; returnCents: number | null; placedAt: string; legs: Leg[] }
 
-const sel = (l: Leg) => (l.selection === '1' ? l.home : l.selection === '2' ? l.away : 'Draw') + ` (${l.selection})`;
+import { MARKETS } from '@/lib/markets';
+
+const marketName = (m: string) => (MARKETS as Record<string, { label: string }>)[m]?.label ?? m;
 
 export default function Bets() {
   const { me } = useApp();
@@ -36,7 +38,7 @@ export default function Bets() {
             </div>
             {b.legs.map((l, i) => (
               <div className="row" style={{ marginTop: 10 }} key={i}>
-                <span><strong>{sel(l)}</strong><br /><span className="muted" style={{ fontSize: 12 }}>{l.home} vs {l.away} · {l.status}</span></span>
+                <span><strong>{l.label}</strong><br /><span className="muted" style={{ fontSize: 12 }}>{marketName(l.market)} · {l.home} vs {l.away}{l.homeScore !== null && l.status !== 'open' ? ` (${l.homeScore}–${l.awayScore})` : ''} · {l.status}</span></span>
                 <strong>{formatOdds(l.priceMilli)}</strong>
               </div>
             ))}

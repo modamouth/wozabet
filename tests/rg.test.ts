@@ -17,8 +17,8 @@ const cb = 'http://x/cb';
 let db: Db;
 let uid: string;
 
-const price = async (fid: string, sel: string) => (await db.q<{ price_milli: number }>('SELECT price_milli FROM odds WHERE fixture_id=$1 AND selection=$2', [fid, sel]))[0].price_milli;
-const bet = async (stakeCents: number, fid = `mock-${DATE}-1`, sel = '1') => placeBet(db, uid, { stakeCents, selections: [{ fixtureId: fid, selection: sel, priceMilli: await price(fid, sel) }] });
+const price = async (fid: string, sel: string) => (await db.q<{ price_milli: number }>("SELECT price_milli FROM odds WHERE fixture_id=$1 AND market='1x2' AND selection=$2", [fid, sel]))[0].price_milli;
+const bet = async (stakeCents: number, fid = `mock-${DATE}-1`, sel = '1') => placeBet(db, uid, { stakeCents, selections: [{ fixtureId: fid, market: '1x2', selection: sel, priceMilli: await price(fid, sel) }] });
 const dep = (amountCents: number) => initiateDeposit(db, provider, { userId: uid, amountCents, callbackUrl: cb });
 
 beforeEach(async () => {

@@ -27,17 +27,18 @@ describe('odds', () => {
 });
 
 describe('settlement logic', () => {
-  const fin = (h: number, a: number, hasDraw = true) => ({ status: 'finished' as const, homeScore: h, awayScore: a, hasDraw });
+  const fin = (h: number, a: number) => ({ status: 'finished' as const, homeScore: h, awayScore: a });
   it('1X2 outcomes', () => {
-    expect(legOutcome('1', fin(2, 1))).toBe('won');
-    expect(legOutcome('X', fin(2, 1))).toBe('lost');
-    expect(legOutcome('X', fin(1, 1))).toBe('won');
-    expect(legOutcome('2', fin(0, 3))).toBe('won');
+    expect(legOutcome('1x2', '1', fin(2, 1))).toBe('won');
+    expect(legOutcome('1x2', 'X', fin(2, 1))).toBe('lost');
+    expect(legOutcome('1x2', 'X', fin(1, 1))).toBe('won');
+    expect(legOutcome('1x2', '2', fin(0, 3))).toBe('won');
   });
-  it('two-way market voids on a tie; cancelled voids; unfinished stays open', () => {
-    expect(legOutcome('1', fin(20, 20, false))).toBe('void');
-    expect(legOutcome('1', { status: 'cancelled', homeScore: null, awayScore: null, hasDraw: true })).toBe('void');
-    expect(legOutcome('1', { status: 'live', homeScore: 1, awayScore: 0, hasDraw: true })).toBe('open');
+  it('cancelled voids; unfinished stays open; unknown selections are voided, never guessed', () => {
+    expect(legOutcome('1x2', '1', { status: 'cancelled', homeScore: null, awayScore: null })).toBe('void');
+    expect(legOutcome('ou25', 'O', { status: 'live', homeScore: 3, awayScore: 0 })).toBe('open');
+    expect(legOutcome('1x2', 'Z', fin(1, 0))).toBe('void');
+    expect(legOutcome('handicap', '1', fin(1, 0))).toBe('void');
   });
   it('resolves bets', () => {
     expect(resolveBet(1000, [{ status: 'won', priceMilli: 2000 }, { status: 'lost', priceMilli: 1500 }]).status).toBe('lost');
@@ -67,5 +68,50 @@ describe('users + provider helpers', () => {
     expect(mapStatus('CANC')).toBe('cancelled');
     expect(parseMatchWinner([{ value: 'Home', odd: '1.9' }, { value: 'Draw', odd: '3.4' }, { value: 'Away', odd: '4.2' }])).toEqual({ '1': 1.9, X: 3.4, '2': 4.2 });
     expect(parseMatchWinner([{ value: 'Home', odd: '1.9' }])).toBeUndefined();
+  });
+});
+
+describe('more markets (90-minute result)', () => {
+  const fin = (h: number, a: number) => ({ status: 'finished' as const, homeScore: h, awayScore: a });
+  it('double chance', () => {
+    expect(legOutcome('dc', '1X', fin(1, 0))).toBe('won');
+    expect(legOutcome('dc', '1X', fin(1, 1))).toBe('won');
+    expect(legOutcome('dc', '1X', fin(0, 1))).toBe('lost');
+    expect(legOutcome('dc', '12', fin(2, 2))).toBe('lost');
+    expect(legOutcome('dc', '12', fin(0, 2))).toBe('won');
+    expect(legOutcome('dc', 'X2', fin(3, 2))).toBe('lost');
+  });
+  it('over/under 2.5', () => {
+    expect(legOutcome('ou25', 'O', fin(2, 1))).toBe('won');
+    expect(legOutcome('ou25', 'U', fin(2, 1))).toBe('lost');
+    expect(legOutcome('ou25', 'U', fin(1, 1))).toBe('won');
+    expect(legOutcome('ou25', 'O', fin(0, 0))).toBe('lost');
+    expect(legOutcome('ou25', 'O', fin(5, 0))).toBe('won');
+  });
+  it('both teams to score', () => {
+    expect(legOutcome('btts', 'Y', fin(1, 1))).toBe('won');
+    expect(legOutcome('btts', 'Y', fin(3, 0))).toBe('lost');
+    expect(legOutcome('btts', 'N', fin(3, 0))).toBe('won');
+    expect(legOutcome('btts', 'N', fin(0, 0))).toBe('won');
+  });
+  it('double-chance margin normalises to 200%', () => {
+    const p = applyMargin({ '1X': 1.07, '12': 1.18, X2: 3.0 }, 0.07, 2);
+    const implied = Object.values(p).reduce((a, m) => a + 1000 / m, 0);
+    expect(implied).toBeGreaterThanOrEqual(2 * 1.07 - 1e-9);
+    expect(implied).toBeLessThan(2 * 1.07 + 0.02);
+  });
+});
+
+describe('API-Football markets + regular-time score', () => {
+  it('parses the four markets from a recorded bookmaker payload and ignores incomplete ones', async () => {
+    const { parseMarkets, regularTimeScore } = await import('@/lib/providers/apiFootball');
+    const rec = (await import('./fixtures/api-football/odds-fixture-1636252.json')).default as any;
+    const m = parseMarkets(rec.response[0].bookmakers[0].bets);
+    expect(Object.keys(m).sort()).toEqual(['1x2', 'btts', 'dc', 'ou25']);
+    expect(parseMarkets([{ id: 5, values: [{ value: 'Over 2.5', odd: '1.9' }] }])).toEqual({});
+    // recorded PEN match: settle on 90 minutes, not on the shoot-out
+    expect(regularTimeScore({ fixture: { status: { short: 'PEN' } }, goals: { home: 3, away: 3 }, score: { fulltime: { home: 3, away: 3 } } })).toEqual({ home: 3, away: 3 });
+    expect(regularTimeScore({ fixture: { status: { short: 'AET' } }, goals: { home: 2, away: 1 }, score: { fulltime: { home: 1, away: 1 } } })).toEqual({ home: 1, away: 1 });
+    expect(regularTimeScore({ fixture: { status: { short: 'FT' } }, goals: { home: 2, away: 0 }, score: { fulltime: { home: 2, away: 0 } } })).toEqual({ home: 2, away: 0 });
   });
 });

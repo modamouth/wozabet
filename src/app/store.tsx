@@ -1,13 +1,14 @@
 'use client';
 import { CSRF_HEADER, readCsrfCookie } from '@/lib/csrf';
+import { selectionLabel } from '@/lib/markets';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-export interface Odd { selection: string; priceMilli: number; suspended: boolean }
+export interface Odd { market: string; selection: string; priceMilli: number; suspended: boolean }
 export interface Match {
   id: string; sport: string; league: string; home: string; away: string; kickoff: string; status: string;
   homeScore: number | null; awayScore: number | null; odds: Odd[];
 }
-export interface Pick { fixtureId: string; selection: '1' | 'X' | '2'; priceMilli: number; pickName: string; game: string }
+export interface Pick { fixtureId: string; market: string; selection: string; priceMilli: number; pickName: string; game: string }
 export interface Me {
   user: { id: string; phone: string; firstName: string; lastName: string; role: string; kycStatus: string; balanceCents: number; sessionReminderMinutes: number | null } | null;
   paymentsEnabled: boolean; minDepositCents: number; minWithdrawalCents: number;
@@ -37,7 +38,7 @@ export async function api<T = any>(path: string, init?: RequestInit & { json?: u
 interface Ctx {
   me: Me | null; refreshMe: () => Promise<void>;
   picks: Record<string, Pick>; toggle: (m: Match, o: Odd) => void; remove: (id: string) => void; clear: () => void;
-  applyPrices: (changed: { fixtureId: string; priceMilli: number }[]) => void;
+  applyPrices: (changed: { fixtureId: string; market: string; selection: string; priceMilli: number }[]) => void;
   slipOpen: boolean; setSlipOpen: (v: boolean) => void;
 }
 const C = createContext<Ctx>(null as unknown as Ctx);
@@ -55,16 +56,16 @@ export function Providers({ children }: { children: ReactNode }) {
     me, refreshMe, picks, slipOpen, setSlipOpen,
     toggle: (m, o) => setPicks((p) => {
       const n = { ...p };
-      if (n[m.id]?.selection === o.selection) { delete n[m.id]; return n; }
-      const pickName = o.selection === '1' ? m.home : o.selection === '2' ? m.away : 'Draw';
-      n[m.id] = { fixtureId: m.id, selection: o.selection as Pick['selection'], priceMilli: o.priceMilli, pickName: `${pickName} (${o.selection})`, game: `${m.home} vs ${m.away}` };
+      // one pick per match (the server enforces this too); tapping the same price again removes it
+      if (n[m.id]?.market === o.market && n[m.id]?.selection === o.selection) { delete n[m.id]; return n; }
+      n[m.id] = { fixtureId: m.id, market: o.market, selection: o.selection, priceMilli: o.priceMilli, pickName: selectionLabel(o.market, o.selection, m.home, m.away), game: `${m.home} vs ${m.away}` };
       return n;
     }),
     remove: (id) => setPicks((p) => { const n = { ...p }; delete n[id]; return n; }),
     clear: () => setPicks({}),
     applyPrices: (changed) => setPicks((p) => {
       const n = { ...p };
-      for (const c of changed) if (n[c.fixtureId]) n[c.fixtureId] = { ...n[c.fixtureId], priceMilli: c.priceMilli };
+      for (const c of changed) if (n[c.fixtureId]?.market === c.market && n[c.fixtureId]?.selection === c.selection) n[c.fixtureId] = { ...n[c.fixtureId], priceMilli: c.priceMilli };
       return n;
     }),
   }), [me, refreshMe, picks, slipOpen]);

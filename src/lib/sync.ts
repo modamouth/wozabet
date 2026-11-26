@@ -1,6 +1,7 @@
 import type { Db, Q } from './db';
 import { config } from './config';
 import { applyMargin } from './odds';
+import { MARKETS, isMarket } from './markets';
 import { settleFixture } from './settle';
 import { newBudget, type Provider, type RequestBudget } from './providers/types';
 import { suspendStaleOdds } from './risk';
@@ -35,22 +36,27 @@ export async function syncFixtures(db: Db, providers: Provider[], dates: string[
              ON CONFLICT (id) DO UPDATE SET league=$3, home=$4, away=$5, kickoff=$6, status=$7, home_score=$8, away_score=$9, updated_at=now()`,
             [f.id, f.sport, f.league, f.home, f.away, f.kickoff, f.status, f.homeScore, f.awayScore],
           );
-          if (f.odds) {
-            const ours = applyMargin(f.odds, config.margin);
-            // suspend prices once the match has started unless live betting is switched on
-            const suspended = f.status === 'scheduled' ? false : !(config.liveBetting && f.status === 'live');
+          // suspend prices once the match has started unless live betting is switched on
+          const suspended = f.status === 'scheduled' ? false : !(config.liveBetting && f.status === 'live');
+          if (!f.markets && f.status !== 'scheduled' && !(config.liveBetting && f.status === 'live')) {
+            await q('UPDATE odds SET suspended=true WHERE fixture_id=$1 AND NOT suspended', [f.id]);
+          }
+          for (const [market, source] of Object.entries(f.markets ?? {})) {
+            if (!isMarket(market) || !source) continue;
+            const ours = applyMargin(source, config.margin, MARKETS[market].overround);
             for (const [sel, price] of Object.entries(ours)) {
+              if (!(MARKETS[market].selections as readonly string[]).includes(sel)) continue;
               await q(
-                `INSERT INTO odds (fixture_id, selection, source_milli, price_milli, suspended, source_updated_at)
-                 VALUES ($1,$2,$3,$4,$5,$6)
-                 ON CONFLICT (fixture_id, selection) DO UPDATE SET source_milli=$3, price_milli=$4, suspended=$5, source_updated_at=$6, updated_at=now()`,
-                [f.id, sel, Math.round(f.odds[sel] * 1000), price, suspended, f.oddsUpdatedAt ?? new Date()],
+                `INSERT INTO odds (fixture_id, market, selection, source_milli, price_milli, suspended, source_updated_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7)
+                 ON CONFLICT (fixture_id, market, selection) DO UPDATE SET source_milli=$4, price_milli=$5, suspended=$6, source_updated_at=$7, updated_at=now()`,
+                [f.id, market, sel, Math.round(source[sel] * 1000), price, suspended, f.oddsUpdatedAt ?? new Date()],
               );
             }
           }
         });
         summary.fixtures += 1;
-        if (f.odds) summary.withOdds += 1;
+        if (f.markets && Object.keys(f.markets).length) summary.withOdds += 1;
         if (config.autoSettle && (f.status === 'finished' || f.status === 'cancelled')) {
           const r = await settleFixture(db, f.id);
           if (!r.alreadySettled) summary.finishedSettled += 1;

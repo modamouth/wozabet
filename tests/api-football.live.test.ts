@@ -20,6 +20,6 @@ describe.skipIf(!live)('API-Football live', () => {
       expect(['scheduled', 'live', 'finished', 'cancelled']).toContain(f.status);
     }
     expect(budget.dailyRemaining).not.toBeNull();
-    console.log(`live: ${list.length} fixtures, ${list.filter((f) => f.odds).length} with odds, ${budget.used} requests, ${budget.dailyRemaining} left today`);
+    console.log(`live: ${list.length} fixtures, ${list.filter((f) => f.markets).length} with odds, ${budget.used} requests, ${budget.dailyRemaining} left today`);
   });
 });

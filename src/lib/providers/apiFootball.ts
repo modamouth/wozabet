@@ -1,6 +1,7 @@
 import { config } from '../config';
 import { leagueName } from '../leagues';
 import type { FixtureStatus } from '../settle-logic';
+import type { MarketKey } from '../markets';
 import { newBudget, type Provider, type ProviderFixture, type RequestBudget } from './types';
 
 /**
@@ -25,6 +26,39 @@ export function parseMatchWinner(values: { value: string; odd: string }[]): Reco
   const out: Record<string, number> = {};
   for (const v of values) if (map[v.value]) out[map[v.value]] = Number(v.odd);
   return Object.keys(out).length === 3 && Object.values(out).every((n) => Number.isFinite(n) && n > 1) ? out : undefined;
+}
+
+type Values = { value: string; odd: string }[];
+/** Pick named values out of an API-Football bet, keep them only if the market is complete and every price is > 1. */
+function pick(values: Values, map: Record<string, string>): Record<string, number> | undefined {
+  const out: Record<string, number> = {};
+  for (const v of values ?? []) if (map[v.value]) out[map[v.value]] = Number(v.odd);
+  const want = Object.keys(map).length;
+  return Object.keys(out).length === want && Object.values(out).every((n) => Number.isFinite(n) && n > 1) ? out : undefined;
+}
+/** API-Football bet ids (checked live via /odds/bets): 1 Match Winner, 5 Goals Over/Under, 8 Both Teams Score, 12 Double Chance. */
+export function parseMarkets(bets: { id: number; values: Values }[]): Partial<Record<MarketKey, Record<string, number>>> {
+  const byId = new Map((bets ?? []).map((b) => [b.id, b.values]));
+  const out: Partial<Record<MarketKey, Record<string, number>>> = {};
+  const m1 = byId.get(1) && parseMatchWinner(byId.get(1)!);
+  const dc = byId.get(12) && pick(byId.get(12)!, { 'Home/Draw': '1X', 'Home/Away': '12', 'Draw/Away': 'X2' });
+  const ou = byId.get(5) && pick(byId.get(5)!, { 'Over 2.5': 'O', 'Under 2.5': 'U' });
+  const bt = byId.get(8) && pick(byId.get(8)!, { Yes: 'Y', No: 'N' });
+  if (m1) out['1x2'] = m1;
+  if (dc) out.dc = dc;
+  if (ou) out.ou25 = ou;
+  if (bt) out.btts = bt;
+  return out;
+}
+
+/**
+ * Score our markets settle on: 90 minutes. For AET/PEN matches `goals` includes extra-time goals, so use
+ * score.fulltime (regular time) instead — e.g. a recorded PEN match: goals 3-3, fulltime 3-3, extratime 0-0, penalty 4-2.
+ */
+export function regularTimeScore(r: any): { home: number | null; away: number | null } {
+  const short = r.fixture?.status?.short;
+  if ((short === 'AET' || short === 'PEN') && r.score?.fulltime) return { home: r.score.fulltime.home, away: r.score.fulltime.away };
+  return { home: r.goals?.home ?? null, away: r.goals?.away ?? null };
 }
 
 export class QuotaError extends Error {}
@@ -72,11 +106,11 @@ export function apiFootballProvider(opts: Partial<ApiFootballOptions> = {}): Pro
     return body;
   }
 
-  function readOdds(r: any): { odds: Record<string, number>; updatedAt?: Date } | null {
+  type Read = { markets: Partial<Record<MarketKey, Record<string, number>>>; updatedAt?: Date };
+  function readOdds(r: any): Read | null {
     const bm = (r.bookmakers ?? []).find((b: any) => String(b.id) === String(o.bookmaker)) ?? r.bookmakers?.[0];
-    const bet = bm?.bets?.find((b: any) => b.id === 1);
-    const odds = bet && parseMatchWinner(bet.values);
-    return odds ? { odds, updatedAt: r.update ? new Date(r.update) : undefined } : null;
+    const markets = parseMarkets(bm?.bets ?? []);
+    return Object.keys(markets).length ? { markets, updatedAt: r.update ? new Date(r.update) : undefined } : null;
   }
 
   return {
@@ -91,7 +125,7 @@ export function apiFootballProvider(opts: Partial<ApiFootballOptions> = {}): Pro
       const needOdds = wanted
         .filter((r) => mapStatus(r.fixture.status.short) === 'scheduled' && new Date(r.fixture.date) > now())
         .sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
-      const odds = new Map<number, { odds: Record<string, number>; updatedAt?: Date }>();
+      const odds = new Map<number, Read>();
       try {
         const page = needOdds.length > (o.perFixtureMax ?? 8) && budget.left >= (o.maxPages ?? 15);
         if (needOdds.length && !page) {
@@ -122,6 +156,7 @@ export function apiFootballProvider(opts: Partial<ApiFootballOptions> = {}): Pro
 
       return wanted.map((r: any): ProviderFixture => {
         const od = odds.get(r.fixture.id);
+        const score = regularTimeScore(r);
         return {
           id: `af-${r.fixture.id}`,
           sport: 'Football',
@@ -130,9 +165,9 @@ export function apiFootballProvider(opts: Partial<ApiFootballOptions> = {}): Pro
           away: r.teams.away.name,
           kickoff: new Date(r.fixture.date),
           status: mapStatus(r.fixture.status.short),
-          homeScore: r.goals.home,
-          awayScore: r.goals.away,
-          odds: od?.odds,
+          homeScore: score.home,
+          awayScore: score.away,
+          markets: od?.markets,
           oddsUpdatedAt: od?.updatedAt,
         };
       });

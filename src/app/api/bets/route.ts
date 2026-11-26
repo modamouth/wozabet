@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 const Body = z.object({
   stakeCents: z.number().int(),
-  selections: z.array(z.object({ fixtureId: z.string(), selection: z.enum(['1', 'X', '2']), priceMilli: z.number().int() })).min(1).max(20),
+  selections: z.array(z.object({ fixtureId: z.string().max(64), market: z.enum(['1x2', 'dc', 'ou25', 'btts']), selection: z.string().max(4), priceMilli: z.number().int().positive() })).min(1).max(20),
 });
 
 export async function GET() {

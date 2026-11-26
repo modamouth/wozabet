@@ -51,7 +51,9 @@ describe('API-Football adapter (recorded live responses)', () => {
     expect(list.find((f) => f.id === 'af-1636231')).toMatchObject({ status: 'live', homeScore: expect.any(Number) });
     const palace = list.find((f) => f.id === 'af-1636252')!;
     expect(palace).toMatchObject({ home: 'Crystal Palace', away: 'Real Sociedad', status: 'scheduled' });
-    expect(palace.odds).toEqual({ '1': expect.any(Number), X: expect.any(Number), '2': expect.any(Number) });
+    expect(palace.markets!['1x2']).toEqual({ '1': expect.any(Number), X: expect.any(Number), '2': expect.any(Number) });
+    expect(Object.keys(palace.markets!).sort()).toEqual(['1x2', 'btts', 'dc', 'ou25']);
+    expect(palace.markets!.ou25).toEqual({ O: expect.any(Number), U: expect.any(Number) });
     expect(palace.oddsUpdatedAt?.toISOString()).toBe('2026-11-26T18:00:20.000Z');
     // only the not-started fixture needed odds: 1 fixtures call + 1 odds call
     expect(api.calls).toEqual(['/fixtures?date=2026-11-26', '/odds?fixture=1636252&bookmaker=8']);
@@ -74,7 +76,7 @@ describe('API-Football adapter (recorded live responses)', () => {
     const list = await p.fetchFixtures('2026-11-26', { budget: newBudget(4) });
     expect(api.calls.some((c) => c.startsWith('/odds?date'))).toBe(false);
     expect(api.calls.filter((c) => c.startsWith('/odds?fixture')).length).toBe(1); // only one recorded fixture is still to start
-    expect(list.find((f) => f.id === 'af-1636252')!.odds).toBeDefined();
+    expect(list.find((f) => f.id === 'af-1636252')!.markets?.['1x2']).toBeDefined();
   });
 
   it('stops when the daily quota is low or the per-minute limit is hit', async () => {
@@ -112,9 +114,15 @@ describe('API-Football adapter (recorded live responses)', () => {
     const p = apiFootballProvider({ key: 'k', leagues: ['3'], bookmaker: '8', fetchImpl: fakeApi().fetchImpl, now: () => NOW });
     const r = await syncFixtures(db, [p], ['2026-11-26']);
     expect(r).toMatchObject({ withOdds: 1, errors: [] });
-    const o = await db.q<any>("SELECT selection, source_milli, price_milli, source_updated_at FROM odds WHERE fixture_id='af-1636252' ORDER BY selection");
-    expect(o).toHaveLength(3);
-    for (const row of o) expect(row.price_milli).toBeLessThan(row.source_milli); // margin applied
+    const o = await db.q<any>("SELECT market, selection, source_milli, price_milli, source_updated_at FROM odds WHERE fixture_id='af-1636252' ORDER BY market, selection");
+    expect(o.map((r: any) => `${r.market}:${r.selection}`)).toEqual(['1x2:1', '1x2:2', '1x2:X', 'btts:N', 'btts:Y', 'dc:12', 'dc:1X', 'dc:X2', 'ou25:O', 'ou25:U']);
+    // every market keeps at least our margin: implied probabilities add up to >= (1 + MARGIN) x the market's overround
+    const MARKETS_OVERROUND: Record<string, number> = { '1x2': 1, dc: 2, ou25: 1, btts: 1 };
+    for (const m of Object.keys(MARKETS_OVERROUND)) {
+      const implied = o.filter((r: any) => r.market === m).reduce((a: number, r: any) => a + 1000 / r.price_milli, 0);
+      expect(implied).toBeGreaterThanOrEqual(MARKETS_OVERROUND[m] * (1 + config.margin) - 1e-9);
+      expect(implied).toBeLessThan(MARKETS_OVERROUND[m] * (1 + config.margin) + 0.02); // and not much more (only round-down)
+    }
   });
 });
 
@@ -130,7 +138,7 @@ describe('odds staleness protection', () => {
     await credit(db.q, uid, 100_000, 'deposit', 'd');
   });
   afterEach(() => Object.assign(config, saved));
-  const price = async (fid: string) => (await db.q<{ price_milli: number }>("SELECT price_milli FROM odds WHERE fixture_id=$1 AND selection='1'", [fid]))[0].price_milli;
+  const price = async (fid: string) => (await db.q<{ price_milli: number }>("SELECT price_milli FROM odds WHERE fixture_id=$1 AND market='1x2' AND selection='1'", [fid]))[0].price_milli;
 
   it('odds not refreshed for N minutes are suspended in listings and refused at bet time', async () => {
     const fid = `mock-${DATE}-1`;
@@ -138,13 +146,13 @@ describe('odds staleness protection', () => {
     await db.q("UPDATE odds SET updated_at = now() - interval '31 minutes' WHERE fixture_id=$1", [fid]);
     const m = (await listMatches(db, { sport: 'Football' })).find((x) => x.id === fid)!;
     expect(m.odds.every((o) => o.suspended)).toBe(true);
-    await expect(placeBet(db, uid, { stakeCents: 1_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: p }] })).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(placeBet(db, uid, { stakeCents: 1_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: p }] })).rejects.toMatchObject({ code: 'unavailable' });
 
     expect(await suspendStaleOdds(db)).toBe(1);
     expect((await listAudit(db.q, { action: 'odds.suspended_stale' }))[0].details).toMatchObject({ fixtures: [fid] });
     // the next successful sync brings fresh prices and lifts the suspension
     await syncFixtures(db, [mockProvider()], [DATE]);
-    expect((await placeBet(db, uid, { stakeCents: 1_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: await price(fid) }] })).stakeCents).toBe(1_000);
+    expect((await placeBet(db, uid, { stakeCents: 1_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: await price(fid) }] })).stakeCents).toBe(1_000);
   });
 
   it('a feed frozen upstream (old provider timestamp) also counts as stale; N is configurable', async () => {
@@ -165,7 +173,7 @@ describe('market exposure limit', () => {
   const saved = { ...config };
   beforeEach(async () => { db = await freshDb(); await syncFixtures(db, [mockProvider()], [DATE]); });
   afterEach(() => Object.assign(config, saved));
-  const price = async (fid: string, sel: string) => (await db.q<{ price_milli: number }>('SELECT price_milli FROM odds WHERE fixture_id=$1 AND selection=$2', [fid, sel]))[0].price_milli;
+  const price = async (fid: string, sel: string) => (await db.q<{ price_milli: number }>("SELECT price_milli FROM odds WHERE fixture_id=$1 AND market='1x2' AND selection=$2", [fid, sel]))[0].price_milli;
   const player = async () => { const u = await makeUser(db); await credit(db.q, u.id, 1_000_000, 'deposit', `d-${u.id}`); return u.id; };
 
   it('refuses bets that push the worst-case loss on a market past the limit, across players', async () => {
@@ -174,28 +182,28 @@ describe('market exposure limit', () => {
     const p1 = await price(fid, '1'); // ~1.9x
     const a = await player(), b = await player();
     // each N$200 single on "1" adds ~N$180 net liability
-    await placeBet(db, a, { stakeCents: 20_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: p1 }] });
-    await placeBet(db, b, { stakeCents: 20_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: p1 }] });
-    const before = await selectionLiability(db.q, fid, '1');
-    await expect(placeBet(db, a, { stakeCents: 40_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: p1 }] }))
-      .rejects.toMatchObject({ code: 'market_limit', data: { fixtureId: fid, selection: '1' } });
-    expect(await selectionLiability(db.q, fid, '1')).toEqual(before); // nothing booked
+    await placeBet(db, a, { stakeCents: 20_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: p1 }] });
+    await placeBet(db, b, { stakeCents: 20_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: p1 }] });
+    const before = await selectionLiability(db.q, fid, '1x2', '1');
+    await expect(placeBet(db, a, { stakeCents: 40_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: p1 }] }))
+      .rejects.toMatchObject({ code: 'market_limit', data: { fixtureId: fid, market: '1x2', selection: '1' } });
+    expect(await selectionLiability(db.q, fid, '1x2', '1')).toEqual(before); // nothing booked
     // money on the other outcomes offsets the liability on "1"
-    await placeBet(db, b, { stakeCents: 20_000, selections: [{ fixtureId: fid, selection: '2', priceMilli: await price(fid, '2') }] });
-    const after = await selectionLiability(db.q, fid, '1');
+    await placeBet(db, b, { stakeCents: 20_000, selections: [{ fixtureId: fid, market: '1x2', selection: '2', priceMilli: await price(fid, '2') }] });
+    const after = await selectionLiability(db.q, fid, '1x2', '1');
     expect(after.netCents).toBe(before.netCents - 20_000);
     // …which now leaves room on "1" for the bet that was refused a moment ago? No: 40k more is still too much, 10k fits
-    await expect(placeBet(db, a, { stakeCents: 40_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: p1 }] })).rejects.toMatchObject({ code: 'market_limit' });
-    expect((await placeBet(db, a, { stakeCents: 10_000, selections: [{ fixtureId: fid, selection: '1', priceMilli: p1 }] })).stakeCents).toBe(10_000);
+    await expect(placeBet(db, a, { stakeCents: 40_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: p1 }] })).rejects.toMatchObject({ code: 'market_limit' });
+    expect((await placeBet(db, a, { stakeCents: 10_000, selections: [{ fixtureId: fid, market: '1x2', selection: '1', priceMilli: p1 }] })).stakeCents).toBe(10_000);
   });
 
   it('counts accumulator legs at full potential return on every market they touch', async () => {
     config.maxMarketLiabilityCents = 30_000;
     const a = await player();
     const f1 = `mock-${DATE}-1`, f2 = `mock-${DATE}-2`;
-    const legs = [{ fixtureId: f1, selection: '1', priceMilli: await price(f1, '1') }, { fixtureId: f2, selection: '1', priceMilli: await price(f2, '1') }];
+    const legs = [{ fixtureId: f1, market: '1x2', selection: '1', priceMilli: await price(f1, '1') }, { fixtureId: f2, market: '1x2', selection: '1', priceMilli: await price(f2, '1') }];
     await expect(placeBet(db, a, { stakeCents: 10_000, selections: legs })).rejects.toMatchObject({ code: 'market_limit' }); // ~N$290 return + already-held 0
     const ok = await placeBet(db, a, { stakeCents: 5_000, selections: legs });
-    expect((await selectionLiability(db.q, f2, '1')).payoutCents).toBe(ok.potentialReturnCents);
+    expect((await selectionLiability(db.q, f2, '1x2', '1')).payoutCents).toBe(ok.potentialReturnCents);
   });
 });
