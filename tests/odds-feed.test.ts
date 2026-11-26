@@ -207,3 +207,17 @@ describe('market exposure limit', () => {
     expect((await selectionLiability(db.q, f2, '1x2', '1')).payoutCents).toBe(ok.potentialReturnCents);
   });
 });
+
+describe('feed selection', () => {
+  const saved = { ...config };
+  afterEach(() => Object.assign(config, saved));
+  it('never uses the mock feed in production without an explicit override', async () => {
+    const { defaultProviders } = await import('@/lib/sync');
+    Object.assign(config, { apiFootballKey: '', mockFeed: false });
+    expect(defaultProviders()).toEqual([]);
+    Object.assign(config, { apiFootballKey: '', mockFeed: true });
+    expect(defaultProviders().map((p) => p.name)).toEqual(['mock']);
+    Object.assign(config, { apiFootballKey: 'k', mockFeed: true });
+    expect(defaultProviders().map((p) => p.name)).toEqual(['api-football']);
+  });
+});

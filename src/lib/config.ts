@@ -13,6 +13,8 @@ export const config = {
   liveBetting: bool(process.env.LIVE_BETTING, false),
   autoSettle: bool(process.env.AUTO_SETTLE, false),
   demoMode: bool(process.env.DEMO_MODE, false),
+  /** Fake fixtures for development. Never on in production unless explicitly forced (e.g. a staging demo). */
+  mockFeed: bool(process.env.MOCK_FEED, process.env.NODE_ENV !== 'production'),
   apiFootballKey: process.env.API_FOOTBALL_KEY ?? '',
   apiFootballLeagues: (process.env.API_FOOTBALL_LEAGUES ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   apiFootballBookmaker: process.env.API_FOOTBALL_BOOKMAKER ?? '8',

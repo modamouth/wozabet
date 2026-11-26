@@ -6,7 +6,7 @@ let running: Promise<void> | null = null;
 
 /** In mock mode, (re)generate sample fixtures whenever there is nothing upcoming, so the app is never empty in dev. */
 export function ensureData(): Promise<void> {
-  if (config.apiFootballKey) return Promise.resolve(); // real data comes from the cron sync
+  if (config.apiFootballKey || !config.mockFeed) return Promise.resolve(); // real data comes from the cron sync; no fake data in production
   running ??= (async () => {
     try {
       const db = await getDb();

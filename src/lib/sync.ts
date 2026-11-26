@@ -9,7 +9,8 @@ import { apiFootballProvider } from './providers/apiFootball';
 import { mockProvider } from './providers/mock';
 
 export function defaultProviders(): Provider[] {
-  return config.apiFootballKey ? [apiFootballProvider()] : [mockProvider()];
+  if (config.apiFootballKey) return [apiFootballProvider()];
+  return config.mockFeed ? [mockProvider()] : []; // production without a feed shows no matches, never fake ones
 }
 
 /** Pull fixtures + reference odds from the provider(s), apply OUR margin, upsert, and optionally auto-settle. */
