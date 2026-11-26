@@ -12,6 +12,7 @@
     "sandbox:webhook": "tsx --env-file=.env scripts/sandbox-webhook.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1178.0",
     "@electric-sql/pglite": "^0.6.0",
     "jose": "^6.2.18",
     "next": "^16.4.6",

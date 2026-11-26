@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, useApp } from '../store';
 import { formatNad, parseNadToCents } from '@/lib/money';
@@ -44,7 +45,7 @@ export function WalletPanel() {
           <input aria-label="Withdrawal amount in N$" inputMode="decimal" placeholder={`N$ (min ${formatNad(me.minWithdrawalCents)})`} value={wd} onChange={(e) => setWd(e.target.value)} style={inputStyle} />
           <button className="btn ghost" onClick={() => run('/api/withdrawals', wd, (c) => `Withdrawal of ${formatNad(c)} requested. We'll review it shortly.`)}>Withdraw</button>
         </div>
-      ) : <p className="muted" style={{ fontSize: 12, margin: 0 }}>Verify your identity to withdraw.</p>}
+      ) : <p className="muted" style={{ fontSize: 12, margin: 0 }}>{u.kycStatus === 'submitted' ? 'Your documents are being reviewed. Withdrawals open once you are verified.' : 'Verify your identity to withdraw.'} {u.kycStatus !== 'submitted' && <Link href="/me/verify" className="green">Verify now ›</Link>}</p>}
       {msg && <p className={msg.ok ? 'green' : 'err'} style={{ fontSize: 13 }}>{msg.text}</p>}
 
       {hist && (hist.deposits.length > 0 || hist.withdrawals.length > 0) && (

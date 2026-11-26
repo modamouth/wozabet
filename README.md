@@ -26,6 +26,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 | Settlement (1X2, two-way, accumulators, void/cancel), idempotent | `src/lib/settle.ts`, `settle-logic.ts` |
 | Odds/fixtures feed: API-Football + mock | `src/lib/providers/`, `sync.ts` |
 | Mobile-wallet deposits (initiate + HMAC-signed webhook), withdrawals with admin review | `src/lib/payments/`, `withdrawals.ts` |
+| KYC: ID number + document upload to private S3-compatible storage, admin review | `src/lib/kyc.ts`, `storage.ts` |
 | Accounts: phone + scrypt password, 18+ enforced server-side, signed cookie session | `src/lib/users.ts`, `auth.ts` |
 | UI (Home, Live, Bet slip, My bets, Me, Join/Login, Admin) | `src/app/` |
 
@@ -56,6 +57,15 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 - **Reject** (a reason is required) refunds the wallet (ledger `withdrawal_reversal`).
 
 Each request can only be decided once, and admins can't review their own.
+
+## KYC (identity verification)
+
+Players open **Me → Verify identity** and enter a Namibian ID number or passport number, plus a photo or scan (JPG/PNG/PDF, max 5 MB).
+- The file type is detected from the file's bytes, not from what the browser claims.
+- A Namibian ID must be 11 digits, and its first six (YYMMDD) must match the date of birth given at sign-up.
+- An ID number can only be linked to one account. A rejection frees it again, in case someone used a stolen ID.
+- Files go to `KYC_STORAGE`: S3-compatible with server-side encryption, or a local folder that must be **outside** the project, written with 0600 permissions. They're never publicly reachable. Admins view them through `/api/admin/kyc/<id>/document`, which is admin-only and served with `no-store` and a locked-down CSP.
+- Status flow: `unverified → submitted → verified | rejected` (after a rejection the player can resubmit). Admins review under **Me → Admin: identity checks** and can't review their own documents. Withdrawals stay blocked until the status is `verified`.
 
 ## Known limits of this MVP
 - Login throttling is in-memory (single server). Use Redis/DB if you scale out.

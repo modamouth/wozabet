@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_name text NOT NULL,
   dob date NOT NULL,
   role text NOT NULL DEFAULT 'player',
-  kyc_status text NOT NULL DEFAULT 'pending',
+  kyc_status text NOT NULL DEFAULT 'unverified',
   self_excluded_until timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -99,4 +99,24 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 );
 CREATE INDEX IF NOT EXISTS withdrawals_status_idx ON withdrawals(status, created_at);
 CREATE INDEX IF NOT EXISTS withdrawals_user_idx ON withdrawals(user_id, created_at DESC);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS id_type text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS id_number text;
+ALTER TABLE users ALTER COLUMN kyc_status SET DEFAULT 'unverified';
+UPDATE users SET kyc_status='unverified' WHERE kyc_status='pending';
+CREATE UNIQUE INDEX IF NOT EXISTS users_id_number_uq ON users(id_type, id_number) WHERE id_number IS NOT NULL;
+CREATE TABLE IF NOT EXISTS kyc_submissions (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id),
+  id_type text NOT NULL,
+  id_number text NOT NULL,
+  doc_key text NOT NULL,
+  doc_mime text NOT NULL,
+  doc_bytes integer NOT NULL,
+  status text NOT NULL DEFAULT 'submitted',
+  reason text,
+  reviewed_by text REFERENCES users(id),
+  reviewed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS kyc_status_idx ON kyc_submissions(status, created_at);
 `;

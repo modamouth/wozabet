@@ -23,7 +23,7 @@ export default function Me() {
         <div className="muted" style={{ fontSize: 12 }}>{u.firstName} {u.lastName} · {u.phone}</div>
         <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Balance</div>
         <div style={{ fontFamily: '"Space Grotesk",sans-serif', fontWeight: 700, fontSize: 30 }}>{formatNad(u.balanceCents)}</div>
-        <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Verification: {u.kycStatus}</div>
+        <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Verification: {u.kycStatus} {u.kycStatus !== 'verified' && <Link href="/me/verify" className="green">›</Link>}</div>
         {me.demoMode ? (
           <>
             <div className="quick">{[100, 500, 1000].map((n) => <button key={n} onClick={() => topUp(n)}>+ N$ {n}</button>)}</div>
@@ -35,6 +35,8 @@ export default function Me() {
       <WalletPanel />
       <div className="menu" style={{ margin: '0 16px', borderTop: '1px solid var(--line)' }}>
         {u.role === 'admin' && <Link href="/admin">Admin: results &amp; settlement <span className="muted">›</span></Link>}
+        <Link href="/me/verify">Verify identity <span className="muted">{u.kycStatus} ›</span></Link>
+        {u.role === 'admin' && <Link href="/admin/kyc">Admin: identity checks <span className="muted">›</span></Link>}
         {u.role === 'admin' && <Link href="/admin/withdrawals">Admin: withdrawals <span className="muted">›</span></Link>}
         <button onClick={logout}>Log out <span className="muted">›</span></button>
       </div>
