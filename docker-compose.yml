@@ -1,0 +1,55 @@
+# Wozabet + Postgres on one host.
+#   cp .env.example .env.production   # fill in production values (see README "Deploy with Docker")
+#   docker compose --env-file .env.production up -d --build
+#   docker compose --env-file .env.production --profile tools run --rm seed   # create the admin user
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wozabet
+      POSTGRES_DB: wozabet
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in your env file}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wozabet -d wozabet"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env.production}
+    environment:
+      DATABASE_URL: postgres://wozabet:${POSTGRES_PASSWORD}@db:5432/wozabet
+      KYC_STORAGE: ${KYC_STORAGE:-local}
+      KYC_LOCAL_DIR: /data/kyc
+    ports:
+      - "3000:3000"
+    volumes:
+      - kycdata:/data/kyc
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # one-off admin tasks (not started by `up`): creates the admin user from ADMIN_PHONE / ADMIN_PASSWORD
+  seed:
+    profiles: ["tools"]
+    build:
+      context: .
+      target: build
+    env_file: ${ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      MOCK_FEED: "false"
+      DATABASE_URL: postgres://wozabet:${POSTGRES_PASSWORD}@db:5432/wozabet
+    command: ["npx", "tsx", "scripts/seed.ts"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  kycdata:

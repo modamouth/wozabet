@@ -16,6 +16,46 @@ npm test                      # odds, settlement, wallet, bets, payments, withdr
 Log in as the admin (`ADMIN_PHONE` / `ADMIN_PASSWORD` from `.env`), open **Me → Admin** to enter results and settle bets.
 With `DEMO_MODE=true` the Me page has play-money top-ups.
 
+## Deploy
+
+The app is one Next.js server plus Postgres. Tables are created and migrated automatically on start-up. A Postgres advisory lock makes several instances starting at once take turns.
+
+### Vercel (current setup)
+
+1. Import the GitHub repo. The framework is pinned to Next.js in `vercel.json`.
+2. **Storage → Create Database → Neon** and connect it to the project. This sets `DATABASE_URL`, using the pooled connection, which is what serverless needs.
+3. **Settings → Environment Variables** (Production):
+   - Always: `AUTH_SECRET` and `CRON_SECRET`, long and random.
+   - For real matches: `API_FOOTBALL_KEY` and `API_FOOTBALL_LEAGUES`.
+   - For sign-up: `SMS_PROVIDER` and the Twilio keys.
+   - For KYC uploads: `KYC_STORAGE=s3` and the `KYC_S3_*` variables. Vercel has no persistent disk.
+   - Payments stay off until `PAYMENTS_PROVIDER` is set.
+4. Redeploy. Environment variables only apply to new deployments.
+5. Create the admin once. Run `npm run seed` from your machine with `DATABASE_URL` pointing at the production database, plus `NODE_ENV=production`, `MOCK_FEED=false`, `ADMIN_PHONE` and `ADMIN_PASSWORD`.
+6. Schedule the odds sync with Vercel Cron (Vercel sends `Authorization: Bearer $CRON_SECRET` automatically) or any external scheduler that calls `GET /api/cron/sync` with that header. Every 5–10 minutes needs a paid API-Football plan and Vercel Pro; Hobby only allows daily cron jobs.
+
+Don't `vercel env pull` into this folder. The Neon variables are also set for Development, so local dev would then write to the production database.
+
+### Docker (your own server)
+
+```bash
+cp .env.example .env.production     # fill in production values; set POSTGRES_PASSWORD, AUTH_SECRET, CRON_SECRET, DEMO_MODE=false
+docker compose --env-file .env.production up -d --build
+docker compose --env-file .env.production --profile tools run --rm seed   # creates the admin from ADMIN_PHONE / ADMIN_PASSWORD
+curl http://localhost:3000/api/health
+```
+
+- `docker-compose.yml` runs Postgres 17 and the app. Postgres data and KYC files live in named volumes (`pgdata`, `kycdata`). Back both up.
+- The image is multi-stage: the Next.js standalone server on Node 22 Alpine, running as a non-root user. Docker restarts the app if `/api/health` keeps failing.
+- Put a TLS-terminating reverse proxy (Caddy, nginx, a cloud load balancer) in front. Set `PUBLIC_BASE_URL` to the https address, and set `TRUST_PROXY=true` so per-IP rate limits use the real client address.
+- Production refuses dev fallbacks: no sandbox payments, no console SMS, no implicit local KYC storage, and no mock matches.
+
+### Operations
+
+- **Health:** `GET /api/health` returns `200 {"status":"ok","checks":{"database":"ok"},…}`, or `503` when the database doesn't answer within 3 s. Point your uptime monitor and load balancer at it.
+- **Logs:** JSON lines on stdout/stderr (`{"ts","level","msg","service":"wozabet",…}`), which Vercel and Docker log drivers parse as-is. Passwords, OTP codes, tokens, ID numbers, documents and phone numbers are redacted by field name. Set the level with `LOG_LEVEL`. Logged events: unhandled errors, payment webhooks (including bad signatures and payments parked for review), odds syncs, CSRF and rate-limit refusals.
+- **Audit trail:** money and admin actions are also in the append-only `audit_log` table (Me → Admin: audit log).
+
 ## How it works
 
 | Part | Where |
@@ -36,7 +76,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 
 ## Going live checklist
 
-1. **Postgres**: set `DATABASE_URL` (tables are created automatically). Dev uses embedded Postgres (PGlite) in `./.data`.
+1. **Postgres**: set `DATABASE_URL` (tables are created automatically). Dev uses embedded Postgres (PGlite) in `./.data`. See [Deploy](#deploy).
 2. **Secrets**: set `AUTH_SECRET` and `CRON_SECRET` (the app refuses to start in production without `AUTH_SECRET`). Set `DEMO_MODE=false`.
 3. **Real odds**: set `API_FOOTBALL_KEY` and `API_FOOTBALL_LEAGUES`, then schedule `POST /api/cron/sync` with the header `Authorization: Bearer $CRON_SECRET`. See [Odds feed](#odds-feed) for the plan you need and how often to sync. Football only: rugby and basketball were removed until a real data source is contracted.
 4. **Payments**: see [Payments](#payments) below. The mobile-wallet adapter's API details are assumptions until checked against your provider's merchant docs.

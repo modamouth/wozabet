@@ -1,10 +1,12 @@
 import { AppError } from './errors';
+import { log } from './log';
 
 export interface SmsSender { name: string; send(toE164: string, text: string): Promise<void> }
 
 /** Dev only: prints the message to the server log. Refused in production. */
 export function consoleSms(): SmsSender {
-  return { name: 'console', async send(to, text) { console.log(`[sms:dev] to ${to}: ${text}`); } };
+  // dev only (refused in production). Kept as plain text so the code is easy to read in the terminal.
+  return { name: 'console', async send(to, text) { log.debug('sms (dev console)', { to: to.slice(0, 7) + '…' }); console.log(`[sms:dev] to ${to}: ${text}`); } };
 }
 
 /** Twilio Programmable Messaging (supports Namibian numbers). */

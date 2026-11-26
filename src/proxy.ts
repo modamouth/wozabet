@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { CSRF_COOKIE, CSRF_HEADER, csrfCheck } from './lib/csrf';
+import { log } from './lib/log';
 
 /** Runs before every request: CSRF checks for API writes, CSRF cookie issuing, and security headers. */
 export function proxy(req: NextRequest) {
@@ -9,6 +10,7 @@ export function proxy(req: NextRequest) {
     cookieToken: req.cookies.get(CSRF_COOKIE)?.value, headerToken: req.headers.get(CSRF_HEADER), allowedOrigins,
   });
   if (!r.ok) {
+    log.warn('csrf refused', { reason: r.reason, method: req.method, path: req.nextUrl.pathname });
     return NextResponse.json({ error: { code: 'csrf', message: 'Your session needs a refresh. Reload the page and try again.' } }, { status: 403 });
   }
   const res = NextResponse.next();
