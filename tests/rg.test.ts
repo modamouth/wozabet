@@ -7,9 +7,8 @@ import { syncFixtures } from '@/lib/sync';
 import { mockProvider } from '@/lib/providers/mock';
 import { sandboxProvider } from '@/lib/payments/sandbox';
 import { initiateDeposit, applyPaymentEvent } from '@/lib/payments/service';
-import { requestWithdrawal } from '@/lib/withdrawals';
 import { setLimit, currentLimit, startCoolOff, selfExclude, setSessionReminder, rgOverview, netLossInWindow, LIMIT_INCREASE_DELAY_HOURS } from '@/lib/rg';
-import { freshDb, makeUser } from './helpers';
+import { freshDb, makeUser, withdrawWithOtp } from './helpers';
 
 const DATE = '2026-11-26';
 const H = 3_600_000;
@@ -101,7 +100,7 @@ describe('cool-off and self-exclusion', () => {
     await expect(bet(1_000)).rejects.toMatchObject({ code: 'cooling_off' });
     await expect(dep(5_000)).rejects.toMatchObject({ code: 'cooling_off' });
     await db.q("UPDATE users SET kyc_status='verified' WHERE id=$1", [uid]);
-    expect((await requestWithdrawal(db, uid, 10_000)).status).toBe('pending');
+    expect((await withdrawWithOtp(db, uid, 10_000)).status).toBe('pending');
   });
   it('time-limited exclusion lasts the chosen months and can only be extended', async () => {
     const now = new Date('2026-11-26T10:00:00Z');

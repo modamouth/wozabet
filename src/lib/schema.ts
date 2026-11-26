@@ -133,4 +133,41 @@ CREATE TABLE IF NOT EXISTS rg_limits (
 );
 CREATE INDEX IF NOT EXISTS rg_limits_user_idx ON rg_limits(user_id, kind, period, id DESC);
 CREATE INDEX IF NOT EXISTS ledger_user_type_time_idx ON ledger(user_id, type, created_at);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at timestamptz;
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id serial PRIMARY KEY,
+  phone text NOT NULL,
+  purpose text NOT NULL,
+  code_hash text NOT NULL,
+  attempts integer NOT NULL DEFAULT 0,
+  expires_at timestamptz NOT NULL,
+  consumed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS otp_lookup_idx ON otp_codes(phone, purpose, id DESC);
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key text NOT NULL,
+  window_start timestamptz NOT NULL,
+  count integer NOT NULL,
+  expires_at timestamptz NOT NULL,
+  PRIMARY KEY (key, window_start)
+);
+CREATE INDEX IF NOT EXISTS rate_limits_exp_idx ON rate_limits(expires_at);
+CREATE TABLE IF NOT EXISTS audit_log (
+  id bigserial PRIMARY KEY,
+  at timestamptz NOT NULL DEFAULT now(),
+  actor_id text,
+  action text NOT NULL,
+  target_type text,
+  target_id text,
+  amount_cents integer,
+  details jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ip text
+);
+CREATE INDEX IF NOT EXISTS audit_action_idx ON audit_log(action, id DESC);
+CREATE INDEX IF NOT EXISTS audit_target_idx ON audit_log(target_id, id DESC);
+CREATE OR REPLACE FUNCTION audit_log_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION 'audit_log is append-only'; END $$;
+DROP TRIGGER IF EXISTS audit_log_no_change ON audit_log;
+CREATE TRIGGER audit_log_no_change BEFORE UPDATE OR DELETE ON audit_log FOR EACH ROW EXECUTE FUNCTION audit_log_immutable();
 `;

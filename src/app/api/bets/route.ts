@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth';
 import { listBets, placeBet } from '@/lib/bets';
 import { getBalance } from '@/lib/wallet';
 import { AppError } from '@/lib/errors';
+import { LIMITS, rateLimit } from '@/lib/ratelimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +24,9 @@ export async function GET() {
 export async function POST(req: Request) {
   return handle(async () => {
     const u = await requireUser();
-    const b = Body.parse(await req.json().catch(() => { throw new AppError('invalid', 'Invalid request'); }));
     const db = await getDb();
+    await rateLimit(db, `bets:${u.uid}`, ...LIMITS.betsPerUser);
+    const b = Body.parse(await req.json().catch(() => { throw new AppError('invalid', 'Invalid request'); }));
     const bet = await placeBet(db, u.uid, b);
     return ok({ bet, balanceCents: await getBalance(db.q, u.uid) }, 201);
   });

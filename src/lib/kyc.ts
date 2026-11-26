@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { Db } from './db';
 import { AppError } from './errors';
 import type { FileStorage } from './storage';
+import { audit } from './audit';
 
 export type KycStatus = 'unverified' | 'submitted' | 'verified' | 'rejected';
 export type IdType = 'national_id' | 'passport';
@@ -57,6 +58,7 @@ export async function submitKyc(db: Db, storage: FileStorage, userId: string, in
       await q('INSERT INTO kyc_submissions (id, user_id, id_type, id_number, doc_key, doc_mime, doc_bytes) VALUES ($1,$2,$3,$4,$5,$6,$7)',
         [id, userId, input.idType, idNumber, key, kind.mime, input.document.byteLength]);
       await q("UPDATE users SET kyc_status='submitted', id_type=$2, id_number=$3 WHERE id=$1", [userId, input.idType, idNumber]);
+      await audit(q, { actorId: userId, action: 'kyc.submitted', targetType: 'kyc', targetId: id, details: { idType: input.idType } });
       return { id, status: 'submitted' as KycStatus };
     });
   } catch (e) {
@@ -80,6 +82,8 @@ export async function reviewKyc(db: Db, adminId: string, submissionId: string, d
       await q("UPDATE kyc_submissions SET status='rejected', reviewed_by=$2, reviewed_at=now(), reason=$3 WHERE id=$1", [submissionId, adminId, decision.reason.trim().slice(0, 500)]);
       await q("UPDATE users SET kyc_status='rejected', id_type=NULL, id_number=NULL WHERE id=$1", [s.user_id]);
     }
+    await audit(q, { actorId: adminId, action: decision.action === 'approve' ? 'kyc.approved' : 'kyc.rejected', targetType: 'kyc', targetId: submissionId,
+      details: { userId: s.user_id, reason: decision.action === 'reject' ? decision.reason.trim() : undefined } });
     return { id: submissionId, userId: s.user_id as string, status: decision.action === 'approve' ? 'approved' : 'rejected' };
   });
 }

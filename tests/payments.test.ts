@@ -7,9 +7,9 @@ import { sandboxProvider } from '@/lib/payments/sandbox';
 import { mobileWalletProvider } from '@/lib/payments/mobileWallet';
 import { getPaymentProvider } from '@/lib/payments';
 import { applyPaymentEvent, initiateDeposit } from '@/lib/payments/service';
-import { requestWithdrawal, reviewWithdrawal, listWithdrawals } from '@/lib/withdrawals';
+import { reviewWithdrawal, listWithdrawals } from '@/lib/withdrawals';
 import type { PaymentProvider } from '@/lib/payments/types';
-import { freshDb, makeUser, ledgerSum } from './helpers';
+import { freshDb, makeUser, ledgerSum, withdrawWithOtp } from './helpers';
 
 const SECRET = 'test-webhook-secret';
 const limits = { minCents: 1_000, maxCents: 500_000 };
@@ -165,7 +165,7 @@ describe('withdrawals', () => {
   it('requires KYC verification', async () => {
     const u = await makeUser(db);
     await credit(db.q, u.id, 50_000, 'deposit', 'd1');
-    await expect(requestWithdrawal(db, u.id, 10_000, wl)).rejects.toMatchObject({ code: 'kyc_required', status: 403 });
+    await expect(withdrawWithOtp(db, u.id, 10_000, wl)).rejects.toMatchObject({ code: 'kyc_required', status: 403 });
     expect(await getBalance(db.q, u.id)).toBe(50_000);
   });
 
@@ -173,11 +173,11 @@ describe('withdrawals', () => {
     const admin = await makeUser(db, { role: 'admin' });
     const u = await makeUser(db, { kyc: 'verified' });
     await credit(db.q, u.id, 50_000, 'deposit', 'd1');
-    await expect(requestWithdrawal(db, u.id, 4_999, wl)).rejects.toMatchObject({ code: 'withdrawal_too_low' });
-    await expect(requestWithdrawal(db, u.id, 60_000, wl)).rejects.toMatchObject({ code: 'insufficient_funds' });
+    await expect(withdrawWithOtp(db, u.id, 4_999, wl)).rejects.toMatchObject({ code: 'withdrawal_too_low' });
+    await expect(withdrawWithOtp(db, u.id, 60_000, wl)).rejects.toMatchObject({ code: 'insufficient_funds' });
 
-    const w1 = await requestWithdrawal(db, u.id, 20_000, wl);
-    const w2 = await requestWithdrawal(db, u.id, 10_000, wl);
+    const w1 = await withdrawWithOtp(db, u.id, 20_000, wl);
+    const w2 = await withdrawWithOtp(db, u.id, 10_000, wl);
     expect(await getBalance(db.q, u.id)).toBe(20_000);
     expect((await listWithdrawals(db, { status: 'pending' })).map((w) => w.id).sort()).toEqual([w1.id, w2.id].sort());
 
@@ -196,7 +196,7 @@ describe('withdrawals', () => {
   it('an admin cannot approve their own withdrawal', async () => {
     const admin = await makeUser(db, { role: 'admin', kyc: 'verified' });
     await credit(db.q, admin.id, 50_000, 'deposit', 'd1');
-    const w = await requestWithdrawal(db, admin.id, 10_000, wl);
+    const w = await withdrawWithOtp(db, admin.id, 10_000, wl);
     await expect(reviewWithdrawal(db, admin.id, w.id, { action: 'approve' })).rejects.toMatchObject({ code: 'forbidden' });
   });
 });

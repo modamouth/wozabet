@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import { getPaymentProvider } from '@/lib/payments';
 import { applyPaymentEvent } from '@/lib/payments/service';
+import { LIMITS, clientIp, hit } from '@/lib/ratelimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ provider: stri
   try { provider = getPaymentProvider(); } catch { return err(503, 'payments_misconfigured'); }
   if (!provider || provider.name !== name) return err(404, 'unknown_provider');
 
+  const db = await getDb();
+  if (!(await hit(db, `webhook:${clientIp(req)}`, ...LIMITS.webhookPerIp)).ok) return err(429, 'rate_limited');
   const raw = await req.text();
   if (raw.length > 64_000) return err(413, 'too_large');
   if (!provider.verifyWebhook(raw, req.headers)) return err(401, 'bad_signature');
@@ -22,7 +25,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ provider: stri
   let ev;
   try { ev = provider.parseWebhook(raw); } catch { return err(400, 'bad_payload'); }
   try {
-    const r = await applyPaymentEvent(await getDb(), provider.name, ev);
+    const r = await applyPaymentEvent(db, provider.name, ev);
     // 200 even for 'review' or a replay: the event was received; retries would not change the outcome
     return NextResponse.json({ ok: true, status: r.status });
   } catch (e) {

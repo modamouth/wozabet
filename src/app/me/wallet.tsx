@@ -12,6 +12,8 @@ export function WalletPanel() {
   const { me, refreshMe } = useApp();
   const [dep, setDep] = useState('');
   const [wd, setWd] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [hist, setHist] = useState<{ deposits: Row[]; withdrawals: Row[] } | null>(null);
   const load = useCallback(() => api<{ deposits: Row[]; withdrawals: Row[] }>('/api/payments').then(setHist).catch(() => {}), []);
@@ -19,10 +21,16 @@ export function WalletPanel() {
   if (!me?.user) return null;
   const u = me.user;
 
-  const run = async (path: string, raw: string, done: (c: number) => string) => {
+  const run = async (path: string, raw: string, done: (c: number) => string, extra: object = {}) => {
     const cents = parseNadToCents(raw);
     if (cents === null || cents <= 0) return setMsg({ ok: false, text: 'Enter an amount like 150 or 150.50' });
-    try { await api(path, { json: { amountCents: cents } }); setMsg({ ok: true, text: done(cents) }); setDep(''); setWd(''); await Promise.all([refreshMe(), load()]); }
+    try { await api(path, { json: { amountCents: cents, ...extra } }); setMsg({ ok: true, text: done(cents) }); setDep(''); setWd(''); setOtp(''); setOtpSent(false); await Promise.all([refreshMe(), load()]); }
+    catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
+  };
+  const sendWithdrawCode = async () => {
+    const cents = parseNadToCents(wd);
+    if (cents === null || cents <= 0) return setMsg({ ok: false, text: 'Enter an amount like 150 or 150.50' });
+    try { await api('/api/withdrawals/otp', { method: 'POST' }); setOtpSent(true); setMsg({ ok: true, text: `We sent a confirmation code to ${u.phone}.` }); }
     catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
   };
 
@@ -41,10 +49,19 @@ export function WalletPanel() {
 
       <div style={{ fontWeight: 600, margin: '16px 0 8px' }}>Withdraw</div>
       {u.kycStatus === 'verified' ? (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input aria-label="Withdrawal amount in N$" inputMode="decimal" placeholder={`N$ (min ${formatNad(me.minWithdrawalCents)})`} value={wd} onChange={(e) => setWd(e.target.value)} style={inputStyle} />
-          <button className="btn ghost" onClick={() => run('/api/withdrawals', wd, (c) => `Withdrawal of ${formatNad(c)} requested. We'll review it shortly.`)}>Withdraw</button>
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input aria-label="Withdrawal amount in N$" inputMode="decimal" placeholder={`N$ (min ${formatNad(me.minWithdrawalCents)})`} value={wd} onChange={(e) => setWd(e.target.value)} style={inputStyle} disabled={otpSent} />
+            {!otpSent && <button className="btn ghost" onClick={sendWithdrawCode}>Withdraw</button>}
+          </div>
+          {otpSent && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input aria-label="SMS confirmation code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit SMS code" value={otp} onChange={(e) => setOtp(e.target.value)} style={inputStyle} />
+              <button className="btn" onClick={() => run('/api/withdrawals', wd, (c) => `Withdrawal of ${formatNad(c)} requested. We'll review it shortly.`, { otpCode: otp })}>Confirm</button>
+              <button className="btn ghost" onClick={() => { setOtpSent(false); setOtp(''); }}>Cancel</button>
+            </div>
+          )}
+        </>
       ) : <p className="muted" style={{ fontSize: 12, margin: 0 }}>{u.kycStatus === 'submitted' ? 'Your documents are being reviewed. Withdrawals open once you are verified.' : 'Verify your identity to withdraw.'} {u.kycStatus !== 'submitted' && <Link href="/me/verify" className="green">Verify now ›</Link>}</p>}
       {msg && <p className={msg.ok ? 'green' : 'err'} style={{ fontSize: 13 }}>{msg.text}</p>}
 

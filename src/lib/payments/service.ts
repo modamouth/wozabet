@@ -5,6 +5,7 @@ import { config } from '../config';
 import { formatNad } from '../money';
 import { depositInTx } from '../wallet';
 import { assertDepositAllowed } from '../rg';
+import { audit } from '../audit';
 import type { PaymentEvent, PaymentProvider } from './types';
 
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'review';
@@ -35,6 +36,7 @@ export async function initiateDeposit(
     await assertDepositAllowed(q, userId, amountCents);
     const m = u.phone.replace(/^\+/, '');
     await q('INSERT INTO payments (id, user_id, provider, amount_cents, msisdn) VALUES ($1,$2,$3,$4,$5)', [id, userId, provider.name, amountCents, m]);
+    await audit(q, { actorId: userId, action: 'deposit.initiated', targetType: 'payment', targetId: id, amountCents, details: { provider: provider.name } });
     return m;
   });
 
@@ -60,6 +62,7 @@ export async function applyPaymentEvent(db: Db, providerName: string, ev: Paymen
     if (!p) throw new AppError('unknown_payment', 'Unknown payment reference', 404);
     const review = async (why: string) => {
       await q("UPDATE payments SET status='review', failure_reason=$2, updated_at=now() WHERE id=$1", [p.id, why.slice(0, 500)]);
+      await audit(q, { actorId: null, action: 'deposit.review', targetType: 'payment', targetId: p.id, amountCents: ev.amountCents, details: { why, providerRef: ev.providerRef, userId: p.user_id } });
       return { id: p.id, status: 'review' as PaymentStatus, changed: true };
     };
 
@@ -70,6 +73,7 @@ export async function applyPaymentEvent(db: Db, providerName: string, ev: Paymen
       if (p.status === 'failed') return { id: p.id, status: 'failed' as PaymentStatus, changed: false };
       await q("UPDATE payments SET status='failed', provider_ref=$2, failure_reason=$3, updated_at=now() WHERE id=$1",
         [p.id, ev.providerRef, (ev.failureReason ?? 'declined').slice(0, 500)]);
+      await audit(q, { actorId: null, action: 'deposit.failed', targetType: 'payment', targetId: p.id, amountCents: p.amount_cents, details: { reason: ev.failureReason, userId: p.user_id } });
       return { id: p.id, status: 'failed' as PaymentStatus, changed: true };
     }
 
@@ -80,6 +84,7 @@ export async function applyPaymentEvent(db: Db, providerName: string, ev: Paymen
 
     await depositInTx(q, p.user_id, p.amount_cents, `${providerName}:${ev.providerRef}`);
     await q("UPDATE payments SET status='completed', provider_ref=$2, updated_at=now() WHERE id=$1", [p.id, ev.providerRef]);
+    await audit(q, { actorId: null, action: 'deposit.completed', targetType: 'payment', targetId: p.id, amountCents: p.amount_cents, details: { providerRef: ev.providerRef, userId: p.user_id } });
     return { id: p.id, status: 'completed' as PaymentStatus, changed: true };
   });
 }

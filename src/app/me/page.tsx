@@ -40,6 +40,7 @@ export default function Me() {
         <Link href="/responsible-gambling">Responsible gambling help <span className="muted">›</span></Link>
         <Link href="/me/verify">Verify identity <span className="muted">{u.kycStatus} ›</span></Link>
         {u.role === 'admin' && <Link href="/admin/kyc">Admin: identity checks <span className="muted">›</span></Link>}
+        {u.role === 'admin' && <Link href="/admin/audit">Admin: audit log <span className="muted">›</span></Link>}
         {u.role === 'admin' && <Link href="/admin/withdrawals">Admin: withdrawals <span className="muted">›</span></Link>}
         <button onClick={logout}>Log out <span className="muted">›</span></button>
       </div>

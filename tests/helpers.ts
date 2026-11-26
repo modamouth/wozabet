@@ -17,3 +17,19 @@ export async function makeUser(db: Db, extra: { role?: 'player' | 'admin'; kyc?:
 export async function ledgerSum(db: Db, uid: string) {
   return (await db.q<{ s: number }>('SELECT COALESCE(SUM(amount_cents),0)::int AS s FROM ledger WHERE user_id=$1', [uid]))[0].s;
 }
+
+import { issueOtp } from '@/lib/otp';
+import { requestWithdrawal } from '@/lib/withdrawals';
+import type { SmsSender } from '@/lib/sms';
+
+/** Captures texts instead of sending them. */
+export function captureSms(): SmsSender & { sent: { to: string; text: string }[] } {
+  const sent: { to: string; text: string }[] = [];
+  return { name: 'capture', sent, async send(to, text) { sent.push({ to, text }); } };
+}
+/** Request a withdrawal the way the app does: issue an SMS code to the user's phone, then submit it. */
+export async function withdrawWithOtp(db: Db, uid: string, amountCents: number, limits?: { minCents: number; maxCents: number }) {
+  const phone = (await db.q<{ phone: string }>('SELECT phone FROM users WHERE id=$1', [uid]))[0].phone;
+  const { code } = await issueOtp(db, captureSms(), phone, 'withdrawal');
+  return requestWithdrawal(db, uid, amountCents, { otpCode: code, limits });
+}

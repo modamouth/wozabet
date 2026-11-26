@@ -40,15 +40,3 @@ export async function requireAdmin() {
   if (u.role !== 'admin') throw new AppError('forbidden', 'Admins only', 403);
   return u;
 }
-
-/** Tiny in-memory login throttle: 8 failures per phone per 10 minutes. Use Redis/DB if you run several servers. */
-const fails = new Map<string, { n: number; t: number }>();
-export function throttleCheck(id: string) {
-  const f = fails.get(id);
-  if (f && Date.now() - f.t < 600_000 && f.n >= 8) throw new AppError('too_many_attempts', 'Too many attempts. Try again in 10 minutes.', 429);
-}
-export function throttleFail(id: string) {
-  const f = fails.get(id);
-  fails.set(id, !f || Date.now() - f.t >= 600_000 ? { n: 1, t: Date.now() } : { n: f.n + 1, t: f.t });
-}
-export const throttleClear = (id: string) => fails.delete(id);

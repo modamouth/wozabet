@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import type { Db, Q } from './db';
 import { AppError } from './errors';
+import { checkOtp, consumeOtp } from './otp';
+import { audit } from './audit';
 
 export function normalizePhone(input: string): string {
   let d = input.replace(/\D/g, '');
@@ -45,19 +47,23 @@ export interface UserRow {
   self_excluded_until: Date | null; password_hash: string;
 }
 
-export async function createUser(db: Db, input: NewUser): Promise<{ id: string; phone: string; role: string }> {
+/** `otpCode` (from the sign-up SMS) is required by the register route; seed scripts may omit it. */
+export async function createUser(db: Db, input: NewUser, opts: { otpCode?: string } = {}): Promise<{ id: string; phone: string; role: string }> {
   const phone = normalizePhone(input.phone);
   if (input.password.length < 8) throw new AppError('weak_password', 'Password must be at least 8 characters');
   if (ageOn(input.dob) < 18) throw new AppError('underage', 'You must be 18 or older to join', 403);
   const id = crypto.randomUUID();
   const role = input.role ?? 'player';
+  const otpId = opts.otpCode !== undefined ? await checkOtp(db, phone, 'signup', opts.otpCode) : null;
   return db.tx(async (q: Q) => {
     const dupe = await q('SELECT 1 FROM users WHERE phone=$1', [phone]);
     if (dupe.length) throw new AppError('phone_taken', 'That number is already registered', 409);
-    await q('INSERT INTO users (id, phone, password_hash, first_name, last_name, dob, role) VALUES ($1,$2,$3,$4,$5,$6,$7)', [
-      id, phone, hashPassword(input.password), input.firstName.trim(), input.lastName.trim(), input.dob, role,
+    if (otpId !== null) await consumeOtp(q, otpId);
+    await q('INSERT INTO users (id, phone, password_hash, first_name, last_name, dob, role, phone_verified_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [
+      id, phone, hashPassword(input.password), input.firstName.trim(), input.lastName.trim(), input.dob, role, otpId !== null ? new Date() : null,
     ]);
     await q('INSERT INTO wallets (user_id) VALUES ($1)', [id]);
+    await audit(q, { actorId: id, action: 'user.registered', targetType: 'user', targetId: id, details: { role, phoneVerified: otpId !== null } });
     return { id, phone, role };
   });
 }

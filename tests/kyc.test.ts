@@ -5,9 +5,8 @@ import fs from 'node:fs';
 import type { Db } from '@/lib/db';
 import { localStorage, getKycStorage, type FileStorage } from '@/lib/storage';
 import { submitKyc, reviewKyc, kycState, listKycSubmissions, readKycDocument, sniffDocument, validateIdNumber } from '@/lib/kyc';
-import { requestWithdrawal } from '@/lib/withdrawals';
 import { credit } from '@/lib/wallet';
-import { freshDb, makeUser } from './helpers';
+import { freshDb, makeUser, withdrawWithOtp } from './helpers';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const PDF = new TextEncoder().encode('%PDF-1.7 fake');
@@ -59,11 +58,11 @@ describe('KYC workflow', () => {
     const admin = await makeUser(db, { role: 'admin' });
     const u = await makeUser(db);
     await credit(db.q, u.id, 50_000, 'deposit', 'd1');
-    await expect(requestWithdrawal(db, u.id, 10_000)).rejects.toMatchObject({ code: 'kyc_required' });
+    await expect(withdrawWithOtp(db, u.id, 10_000)).rejects.toMatchObject({ code: 'kyc_required' });
 
     const s = await submitKyc(db, storage, u.id, { idType: 'national_id', idNumber: NAM_ID, document: PNG });
     expect((await kycState(db, u.id)).status).toBe('submitted');
-    await expect(requestWithdrawal(db, u.id, 10_000)).rejects.toMatchObject({ code: 'kyc_required' }); // still blocked while in review
+    await expect(withdrawWithOtp(db, u.id, 10_000)).rejects.toMatchObject({ code: 'kyc_required' }); // still blocked while in review
     await expect(submitKyc(db, storage, u.id, { idType: 'national_id', idNumber: NAM_ID, document: PNG })).rejects.toMatchObject({ code: 'kyc_pending' });
 
     const pending = await listKycSubmissions(db, 'submitted');
@@ -80,7 +79,7 @@ describe('KYC workflow', () => {
     await reviewKyc(db, admin.id, s.id, { action: 'approve' });
     await expect(reviewKyc(db, admin.id, s.id, { action: 'reject', reason: 'x' })).rejects.toMatchObject({ code: 'not_pending' });
     expect((await kycState(db, u.id)).status).toBe('verified');
-    expect((await requestWithdrawal(db, u.id, 10_000)).status).toBe('pending');
+    expect((await withdrawWithOtp(db, u.id, 10_000)).status).toBe('pending');
   });
 
   it('reject shows the reason, frees the ID number and allows resubmission', async () => {

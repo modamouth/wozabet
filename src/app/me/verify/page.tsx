@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useApp } from '../../store';
+import { api, useApp } from '../../store';
 
 interface State { status: 'unverified' | 'submitted' | 'verified' | 'rejected'; lastReason: string | null }
 
@@ -15,7 +15,7 @@ export default function Verify() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const load = () => fetch('/api/kyc', { cache: 'no-store' }).then((r) => r.json()).then(setSt).catch(() => {});
+  const load = () => api<State>('/api/kyc').then(setSt).catch(() => {});
   useEffect(() => { if (me?.user) void load(); }, [me]);
   if (!me?.user) return <div className="empty">Please <Link href="/login" className="green">log in</Link>.</div>;
   if (!st) return <div className="empty">Loading…</div>;
@@ -26,10 +26,8 @@ export default function Verify() {
     setBusy(true); setErr('');
     const fd = new FormData();
     fd.set('idType', idType); fd.set('idNumber', idNumber); fd.set('document', file);
-    const res = await fetch('/api/kyc', { method: 'POST', body: fd });
-    const body = await res.json().catch(() => ({}));
+    try { await api('/api/kyc', { form: fd }); } catch (e) { setBusy(false); return setErr((e as Error).message); }
     setBusy(false);
-    if (!res.ok) return setErr(body?.error?.message ?? 'Upload failed');
     await Promise.all([load(), refreshMe()]);
   };
 

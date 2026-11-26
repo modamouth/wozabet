@@ -28,6 +28,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 | Mobile-wallet deposits (initiate + HMAC-signed webhook), withdrawals with admin review | `src/lib/payments/`, `withdrawals.ts` |
 | KYC: ID number + document upload to private S3-compatible storage, admin review | `src/lib/kyc.ts`, `storage.ts` |
 | Responsible gambling: deposit/loss limits, session reminder, cool-off, self-exclusion (enforced server-side) | `src/lib/rg.ts` |
+| Security: SMS OTP (sign-up, withdrawals), DB rate limits, CSRF, append-only audit log | `src/lib/otp.ts`, `ratelimit.ts`, `csrf.ts`, `proxy.ts`, `audit.ts` |
 | Accounts: phone + scrypt password, 18+ enforced server-side, signed cookie session | `src/lib/users.ts`, `auth.ts` |
 | UI (Home, Live, Bet slip, My bets, Me, Join/Login, Admin) | `src/app/` |
 
@@ -83,7 +84,16 @@ Players manage these under **Me → Deposit & loss limits** and **Me → Take a 
 
 Players on a cool-off or self-exclusion can still log in and **withdraw** their balance. The help page is `/responsible-gambling`, and its helpline details are placeholders for your compliance team.
 
+## Security
+
+- **SMS OTP.** Sign-up is: details → `POST /api/auth/otp` → code → `POST /api/auth/register {…, otpCode}`. Withdrawals are: `POST /api/withdrawals/otp` → `POST /api/withdrawals {amountCents, otpCode}`.
+  - Codes are 6 digits, valid for 5 minutes, and stored only as an HMAC. A code works once, for its own phone number and purpose.
+  - Five wrong guesses burn the code. You can request a code once a minute, up to 5 per hour.
+  - In dev, codes are printed in the server log (`SMS_PROVIDER=console`). In production `SMS_PROVIDER=twilio` is required.
+- **Rate limits** are stored in Postgres (`rate_limits` table), so they hold across servers and restarts. They cover login (per IP, plus failures per phone), register, OTP sends, bets, deposits, withdrawals, KYC uploads, limit changes, admin actions and webhooks. All values are in `LIMITS` in `src/lib/ratelimit.ts`. Set `TRUST_PROXY=true` only behind your own load balancer.
+- **CSRF.** `src/proxy.ts` checks every API write: the Origin (or Referer) must be our own site or `ALLOWED_ORIGINS`, and the `wb_csrf` cookie must match the `x-csrf-token` header. Webhooks and cron are exempt because they use signatures or a bearer secret, not cookies. The proxy also sets security headers (nosniff, frame-deny, referrer policy, and HSTS in production).
+- **Audit log.** The `audit_log` table is append-only: a database trigger blocks UPDATE and DELETE. It's written in the same transaction as the action it records. It covers deposits (initiated, completed, failed, review), withdrawals (requested, approved, rejected), KYC (submitted, approved, rejected, document viewed), results and settlement, bets placed, responsible-gambling changes, logins and failed logins, OTP sends, and manual syncs. Admins can view it under **Me → Admin: audit log**.
+
 ## Known limits of this MVP
-- Login throttling is in-memory (single server). Use Redis/DB if you scale out.
-- No rate limiting on other endpoints, no CSRF token (cookies are SameSite=Lax), no email/SMS verification (OTP) yet.
+- Sessions are 30-day signed cookies with no server-side revocation list yet. Changing the password doesn't sign out other devices.
 - Only 1X2 / two-way match-winner markets, singles and accumulators.

@@ -5,6 +5,7 @@ import { requireUser } from '@/lib/auth';
 import { AppError } from '@/lib/errors';
 import { getPaymentProvider, webhookUrl } from '@/lib/payments';
 import { initiateDeposit } from '@/lib/payments/service';
+import { LIMITS, rateLimit } from '@/lib/ratelimit';
 
 const Body = z.object({ amountCents: z.number().int() });
 
@@ -14,8 +15,10 @@ export async function POST(req: Request) {
     const u = await requireUser();
     const provider = getPaymentProvider();
     if (!provider) throw new AppError('payments_disabled', 'Deposits are not available yet', 503);
+    const db = await getDb();
+    await rateLimit(db, `deposit:${u.uid}`, ...LIMITS.depositsPerUser);
     const b = Body.parse(await req.json().catch(() => { throw new AppError('invalid', 'Invalid request'); }));
-    const r = await initiateDeposit(await getDb(), provider, { userId: u.uid, amountCents: b.amountCents, callbackUrl: webhookUrl(provider) });
+    const r = await initiateDeposit(db, provider, { userId: u.uid, amountCents: b.amountCents, callbackUrl: webhookUrl(provider) });
     return ok({ payment: r }, 201);
   });
 }

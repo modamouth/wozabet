@@ -1,4 +1,5 @@
 'use client';
+import { CSRF_HEADER, readCsrfCookie } from '@/lib/csrf';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export interface Odd { selection: string; priceMilli: number; suspended: boolean }
@@ -16,12 +17,16 @@ export interface Me {
 export class ApiError extends Error {
   constructor(public code: string, message: string, public data?: any) { super(message); }
 }
-export async function api<T = any>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+/** Headers every state-changing request needs (CSRF double-submit token). */
+export const csrfHeaders = (): Record<string, string> => ({ [CSRF_HEADER]: readCsrfCookie(document.cookie) });
+
+export async function api<T = any>(path: string, init?: RequestInit & { json?: unknown; form?: FormData }): Promise<T> {
+  const method = init?.method ?? (init?.json !== undefined || init?.form ? 'POST' : 'GET');
   const res = await fetch(path, {
     ...init,
-    method: init?.method ?? (init?.json !== undefined ? 'POST' : 'GET'),
-    headers: init?.json !== undefined ? { 'content-type': 'application/json' } : undefined,
-    body: init?.json !== undefined ? JSON.stringify(init.json) : undefined,
+    method,
+    headers: { ...(init?.json !== undefined ? { 'content-type': 'application/json' } : {}), ...(method !== 'GET' ? csrfHeaders() : {}) },
+    body: init?.form ?? (init?.json !== undefined ? JSON.stringify(init.json) : undefined),
     cache: 'no-store',
   });
   const body = await res.json().catch(() => ({}));

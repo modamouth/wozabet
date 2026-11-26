@@ -4,6 +4,8 @@ import { AppError } from './errors';
 import { config } from './config';
 import { formatNad } from './money';
 import { credit, debit } from './wallet';
+import { checkOtp, consumeOtp } from './otp';
+import { audit } from './audit';
 
 export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
 
@@ -12,17 +14,24 @@ export type WithdrawalStatus = 'pending' | 'approved' | 'rejected';
  * (ledger 'withdrawal'), so it can't be bet or withdrawn twice while an admin reviews it. Payout goes to the
  * user's REGISTERED mobile number only.
  */
-export async function requestWithdrawal(db: Db, userId: string, amountCents: number, limits = { minCents: config.minWithdrawalCents, maxCents: config.maxWithdrawalCents }) {
+export async function requestWithdrawal(db: Db, userId: string, amountCents: number, opts: { otpCode: string; limits?: { minCents: number; maxCents: number } }) {
+  const limits = opts.limits ?? { minCents: config.minWithdrawalCents, maxCents: config.maxWithdrawalCents };
   if (!Number.isInteger(amountCents) || amountCents <= 0) throw new AppError('bad_amount', 'Amount must be a whole number of cents');
   if (amountCents < limits.minCents) throw new AppError('withdrawal_too_low', `Minimum withdrawal is ${formatNad(limits.minCents)}`);
   if (amountCents > limits.maxCents) throw new AppError('withdrawal_too_high', `Maximum withdrawal is ${formatNad(limits.maxCents)}`);
+  const pre = (await db.q<{ phone: string; kyc_status: string }>('SELECT phone, kyc_status FROM users WHERE id=$1', [userId]))[0];
+  if (!pre) throw new AppError('no_user', 'User not found', 404);
+  if (pre.kyc_status !== 'verified') throw new AppError('kyc_required', 'Verify your identity before withdrawing', 403);
+  const otpId = await checkOtp(db, pre.phone, 'withdrawal', opts.otpCode);
   return db.tx(async (q) => {
     const u = (await q<{ phone: string; kyc_status: string }>('SELECT phone, kyc_status FROM users WHERE id=$1 FOR UPDATE', [userId]))[0];
     if (!u) throw new AppError('no_user', 'User not found', 404);
     if (u.kyc_status !== 'verified') throw new AppError('kyc_required', 'Verify your identity before withdrawing', 403);
+    await consumeOtp(q, otpId);
     const id = crypto.randomUUID();
     const balance = await debit(q, userId, amountCents, 'withdrawal', id);
     await q('INSERT INTO withdrawals (id, user_id, amount_cents, msisdn) VALUES ($1,$2,$3,$4)', [id, userId, amountCents, u.phone.replace(/^\+/, '')]);
+    await audit(q, { actorId: userId, action: 'withdrawal.requested', targetType: 'withdrawal', targetId: id, amountCents });
     return { id, status: 'pending' as WithdrawalStatus, amountCents, balanceCents: balance };
   });
 }
@@ -43,6 +52,8 @@ export async function reviewWithdrawal(db: Db, adminId: string, withdrawalId: st
     await q("UPDATE withdrawals SET status=$2, reviewed_by=$3, reviewed_at=now(), reason=$4 WHERE id=$1 AND status='pending'",
       [withdrawalId, status, adminId, decision.action === 'reject' ? decision.reason.trim().slice(0, 500) : null]);
     if (status === 'rejected') await credit(q, w.user_id, w.amount_cents, 'withdrawal_reversal', withdrawalId);
+    await audit(q, { actorId: adminId, action: `withdrawal.${status}`, targetType: 'withdrawal', targetId: withdrawalId, amountCents: w.amount_cents,
+      details: { userId: w.user_id, reason: decision.action === 'reject' ? decision.reason.trim() : undefined } });
     return { id: withdrawalId, status, userId: w.user_id as string, amountCents: w.amount_cents as number };
   });
 }

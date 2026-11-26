@@ -1,6 +1,7 @@
 import type { Db, Q } from './db';
 import { AppError } from './errors';
 import { formatNad } from './money';
+import { audit } from './audit';
 
 /**
  * Responsible gambling. Everything here is enforced on the server for deposits and bets.
@@ -54,6 +55,7 @@ export async function setLimit(db: Db, userId: string, kind: LimitKind, period: 
     const effectiveFrom = loosening ? new Date(now.getTime() + LIMIT_INCREASE_DELAY_HOURS * 3_600_000) : now;
     await q('INSERT INTO rg_limits (user_id, kind, period, amount_cents, effective_from, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
       [userId, kind, period, amountCents, effectiveFrom, now]);
+    await audit(q, { actorId: userId, action: 'rg.limit', targetType: 'user', targetId: userId, amountCents: amountCents ?? undefined, details: { kind, period, previous: cur.amountCents, effectiveFrom } });
     return { amountCents, effectiveFrom: effectiveFrom.toISOString(), delayed: loosening };
   });
 }
@@ -122,6 +124,7 @@ export async function startCoolOff(db: Db, userId: string, option: CoolOff, now 
   const r = await db.q<{ cool_off_until: Date }>(
     'UPDATE users SET cool_off_until = GREATEST(COALESCE(cool_off_until, $2), $2) WHERE id=$1 RETURNING cool_off_until', [userId, until]);
   if (!r[0]) throw new AppError('no_user', 'User not found', 404);
+  await audit(db.q, { actorId: userId, action: 'rg.cool_off', targetType: 'user', targetId: userId, details: { option, until: r[0].cool_off_until } });
   return { until: new Date(r[0].cool_off_until).toISOString() };
 }
 
@@ -131,6 +134,7 @@ export async function selfExclude(db: Db, userId: string, option: SelfExclusion,
   if (option === 'permanent') {
     const r = await db.q('UPDATE users SET self_excluded_permanent=true WHERE id=$1 RETURNING id', [userId]);
     if (!r[0]) throw new AppError('no_user', 'User not found', 404);
+    await audit(db.q, { actorId: userId, action: 'rg.self_exclusion', targetType: 'user', targetId: userId, details: { option } });
     return { until: null, permanent: true };
   }
   const until = new Date(now);
@@ -138,6 +142,7 @@ export async function selfExclude(db: Db, userId: string, option: SelfExclusion,
   const r = await db.q<{ self_excluded_until: Date }>(
     'UPDATE users SET self_excluded_until = GREATEST(COALESCE(self_excluded_until, $2), $2) WHERE id=$1 RETURNING self_excluded_until', [userId, until]);
   if (!r[0]) throw new AppError('no_user', 'User not found', 404);
+  await audit(db.q, { actorId: userId, action: 'rg.self_exclusion', targetType: 'user', targetId: userId, details: { option, until: r[0].self_excluded_until } });
   return { until: new Date(r[0].self_excluded_until).toISOString(), permanent: false };
 }
 

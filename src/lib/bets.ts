@@ -5,6 +5,7 @@ import { config } from './config';
 import { debit } from './wallet';
 import { potentialReturnCents, totalOddsMilli } from './odds';
 import { assertStakeAllowed } from './rg';
+import { audit } from './audit';
 
 export interface SelectionInput { fixtureId: string; selection: string; priceMilli: number }
 
@@ -63,6 +64,7 @@ export async function placeBet(db: Db, userId: string, input: { stakeCents: numb
     for (const s of selections) {
       await q('INSERT INTO bet_legs (bet_id, fixture_id, selection, price_milli) VALUES ($1,$2,$3,$4)', [betId, s.fixtureId, s.selection, s.priceMilli]);
     }
+    await audit(q, { actorId: userId, action: 'bet.placed', targetType: 'bet', targetId: betId, amountCents: stakeCents, details: { legs: selections.length, totalOddsMilli: total, potentialReturnCents: potential } });
     return { id: betId, stakeCents, totalOddsMilli: total, potentialReturnCents: potential };
   });
 }
