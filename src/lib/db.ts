@@ -25,8 +25,17 @@ export async function createPgliteDb(dataDir?: string): Promise<Db> {
 /** Real Postgres via node-postgres (production). */
 export async function createPgDb(url: string): Promise<Db> {
   const { Pool } = await import('pg');
-  const pool = new Pool({ connectionString: url, max: 10 });
-  await pool.query(SCHEMA);
+  // serverless (Vercel) runs many small instances: keep each pool small and use the provider's POOLED connection string
+  const pool = new Pool({ connectionString: url, max: process.env.VERCEL ? 3 : 10 });
+  // several instances can cold-start at once: an advisory lock makes them create/migrate the schema one at a time
+  const c = await pool.connect();
+  try {
+    await c.query('SELECT pg_advisory_lock(727274001)');
+    await c.query(SCHEMA);
+  } finally {
+    await c.query('SELECT pg_advisory_unlock(727274001)').catch(() => {});
+    c.release();
+  }
   const q: Q = async (sql, params) => (await pool.query(sql, params as any[])).rows;
   return {
     q,
