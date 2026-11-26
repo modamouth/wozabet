@@ -6,11 +6,12 @@ import { debit } from './wallet';
 import { potentialReturnCents, totalOddsMilli } from './odds';
 import { assertStakeAllowed } from './rg';
 import { audit } from './audit';
+import { assertWithinLiability, staleSql } from './risk';
 
 export interface SelectionInput { fixtureId: string; selection: string; priceMilli: number }
 
 interface LegCheckRow {
-  id: string; status: string; kickoff: Date; price_milli: number | null; suspended: boolean | null;
+  id: string; status: string; kickoff: Date; price_milli: number | null; suspended: boolean | null; stale: boolean | null;
 }
 
 export async function placeBet(db: Db, userId: string, input: { stakeCents: number; selections: SelectionInput[] }) {
@@ -28,19 +29,21 @@ export async function placeBet(db: Db, userId: string, input: { stakeCents: numb
     const u = await q('SELECT 1 FROM users WHERE id=$1 FOR UPDATE', [userId]);
     if (!u[0]) throw new AppError('no_user', 'User not found', 404);
     await assertStakeAllowed(q, userId, stakeCents);
+    // lock the fixtures (in a fixed order, so concurrent bets can't deadlock) for the exposure check below
+    await q('SELECT id FROM fixtures WHERE id = ANY($1::text[]) ORDER BY id FOR UPDATE', [selections.map((s) => s.fixtureId)]);
 
     const changed: SelectionInput[] = [];
     const unavailable: string[] = [];
     for (const s of selections) {
       const r = await q<LegCheckRow>(
-        `SELECT f.id, f.status, f.kickoff, o.price_milli, o.suspended
+        `SELECT f.id, f.status, f.kickoff, o.price_milli, o.suspended, ${staleSql('o')} AS stale
            FROM fixtures f LEFT JOIN odds o ON o.fixture_id = f.id AND o.selection = $2 WHERE f.id = $1`,
         [s.fixtureId, s.selection],
       );
       const row = r[0];
       const open = row && (row.status === 'scheduled' || (config.liveBetting && row.status === 'live'));
       const timeOk = row && (row.status === 'live' || new Date(row.kickoff) > new Date());
-      if (!row || row.price_milli === null || row.suspended || !open || !timeOk) {
+      if (!row || row.price_milli === null || row.suspended || row.stale || !open || !timeOk) {
         unavailable.push(s.fixtureId);
       } else if (row.price_milli !== s.priceMilli) {
         changed.push({ fixtureId: s.fixtureId, selection: s.selection, priceMilli: row.price_milli });
@@ -54,6 +57,8 @@ export async function placeBet(db: Db, userId: string, input: { stakeCents: numb
     if (potential > config.maxPayoutCents) {
       throw new AppError('payout_limit', `Maximum payout is N$ ${(config.maxPayoutCents / 100).toFixed(2)}. Lower your stake.`);
     }
+
+    await assertWithinLiability(q, { legs: selections, stakeCents, potentialReturnCents: potential });
 
     const betId = crypto.randomUUID();
     await debit(q, userId, stakeCents, 'bet_stake', betId);

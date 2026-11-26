@@ -1,0 +1,806 @@
+{
+ "get": "fixtures",
+ "parameters": {
+  "date": "2026-11-26"
+ },
+ "errors": [],
+ "results": 12,
+ "paging": {
+  "current": 1,
+  "total": 1
+ },
+ "response": [
+  {
+   "fixture": {
+    "id": 1636252,
+    "referee": "Rohit Saggi",
+    "timezone": "UTC",
+    "date": "2026-11-26T20:00:00+00:00",
+    "timestamp": 1795723200,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 525,
+     "name": "Selhurst Park",
+     "city": "London"
+    },
+    "status": {
+     "long": "Not Started",
+     "short": "NS",
+     "elapsed": null,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 52,
+     "name": "Crystal Palace",
+     "winner": null
+    },
+    "away": {
+     "id": 548,
+     "name": "Real Sociedad",
+     "winner": null
+    }
+   },
+   "goals": {
+    "home": null,
+    "away": null
+   },
+   "score": {
+    "halftime": {
+     "home": null,
+     "away": null
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1636231,
+    "referee": "Morten Krogh",
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 20423,
+     "name": "Batumi Arena",
+     "city": "Batumi"
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 52,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 549,
+     "name": "Be\u015fikta\u015f",
+     "winner": null
+    },
+    "away": {
+     "id": 563,
+     "name": "Hapoel Beer Sheva",
+     "winner": null
+    }
+   },
+   "goals": {
+    "home": 0,
+    "away": 0
+   },
+   "score": {
+    "halftime": {
+     "home": 0,
+     "away": 0
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1636244,
+    "referee": "Harm Osmers",
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 22784,
+     "name": "Municipal de Bala\u00eddos",
+     "city": "Vigo"
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 86,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 538,
+     "name": "Celta Vigo",
+     "winner": false
+    },
+    "away": {
+     "id": 35,
+     "name": "Bournemouth",
+     "winner": true
+    }
+   },
+   "goals": {
+    "home": 1,
+    "away": 2
+   },
+   "score": {
+    "halftime": {
+     "home": 1,
+     "away": 0
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1636255,
+    "referee": "Mikola Balakin",
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 22430,
+     "name": "Stadion Maksimir",
+     "city": "Zagreb"
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 87,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 620,
+     "name": "Dinamo Zagreb",
+     "winner": false
+    },
+    "away": {
+     "id": 168,
+     "name": "Bayer Leverkusen",
+     "winner": true
+    }
+   },
+   "goals": {
+    "home": 0,
+    "away": 2
+   },
+   "score": {
+    "halftime": {
+     "home": 0,
+     "away": 2
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1636298,
+    "referee": "Nikola Dabanovic",
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 12678,
+     "name": "Orange V\u00e9lodrome",
+     "city": "Marseille"
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 86,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 81,
+     "name": "Marseille",
+     "winner": true
+    },
+    "away": {
+     "id": 646,
+     "name": "Levski Sofia",
+     "winner": false
+    }
+   },
+   "goals": {
+    "home": 1,
+    "away": 0
+   },
+   "score": {
+    "halftime": {
+     "home": 1,
+     "away": 0
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1636307,
+    "referee": "Chris Kavanagh",
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 775,
+     "name": "Karaiskakis Stadium",
+     "city": "Piraeus"
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 87,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 553,
+     "name": "Olympiakos Piraeus",
+     "winner": false
+    },
+    "away": {
+     "id": 489,
+     "name": "AC Milan",
+     "winner": true
+    }
+   },
+   "goals": {
+    "home": 2,
+    "away": 3
+   },
+   "score": {
+    "halftime": {
+     "home": 1,
+     "away": 0
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1636315,
+    "referee": "Igor Pajac",
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 438,
+     "name": "Doosan Arena",
+     "city": "Pilsner"
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 87,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "country": "World",
+    "season": 2026,
+    "round": "League Stage - 5",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 567,
+     "name": "Plzen",
+     "winner": true
+    },
+    "away": {
+     "id": 211,
+     "name": "Benfica",
+     "winner": false
+    }
+   },
+   "goals": {
+    "home": 4,
+    "away": 0
+   },
+   "score": {
+    "halftime": {
+     "home": 3,
+     "away": 0
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1639789,
+    "referee": "Guillermo Enrique Guerrero Alcivar",
+    "timezone": "UTC",
+    "date": "2026-11-26T00:00:00+00:00",
+    "timestamp": 1795651200,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": 466,
+     "name": "Estadio Monumental Isidro Romero Carbo",
+     "city": "Guayaquil"
+    },
+    "status": {
+     "long": "Match Finished",
+     "short": "FT",
+     "elapsed": 90,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 242,
+    "name": "Liga Pro",
+    "country": "Ecuador",
+    "season": 2026,
+    "round": "Championship Group - 1",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 1152,
+     "name": "Barcelona SC",
+     "winner": null
+    },
+    "away": {
+     "id": 1153,
+     "name": "Independiente del Valle",
+     "winner": null
+    }
+   },
+   "goals": {
+    "home": 1,
+    "away": 1
+   },
+   "score": {
+    "halftime": {
+     "home": 0,
+     "away": 1
+    },
+    "fulltime": {
+     "home": 1,
+     "away": 1
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1649282,
+    "referee": null,
+    "timezone": "UTC",
+    "date": "2026-11-26T14:00:00+00:00",
+    "timestamp": 1795701600,
+    "periods": {
+     "first": null,
+     "second": null
+    },
+    "venue": {
+     "id": null,
+     "name": null,
+     "city": null
+    },
+    "status": {
+     "long": "Match Postponed",
+     "short": "PST",
+     "elapsed": null,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 584,
+    "name": "Premier League",
+    "country": "Libya",
+    "season": 2026,
+    "round": "Regular season",
+    "standings": false
+   },
+   "teams": {
+    "home": {
+     "id": 27454,
+     "name": "Assabah SC",
+     "winner": null
+    },
+    "away": {
+     "id": 12424,
+     "name": "Al Ahli Tripoli",
+     "winner": null
+    }
+   },
+   "goals": {
+    "home": null,
+    "away": null
+   },
+   "score": {
+    "halftime": {
+     "home": null,
+     "away": null
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1621676,
+    "referee": null,
+    "timezone": "UTC",
+    "date": "2026-11-26T17:45:00+00:00",
+    "timestamp": 1795715100,
+    "periods": {
+     "first": 1795715100,
+     "second": 1795718700
+    },
+    "venue": {
+     "id": null,
+     "name": null,
+     "city": null
+    },
+    "status": {
+     "long": "Second Half",
+     "short": "2H",
+     "elapsed": 84,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 496,
+    "name": "Liga Alef",
+    "country": "Israel",
+    "season": 2026,
+    "round": "South - 11",
+    "standings": false
+   },
+   "teams": {
+    "home": {
+     "id": 6163,
+     "name": "Hapoel Mahane Yehuda",
+     "winner": true
+    },
+    "away": {
+     "id": 4498,
+     "name": "Hapoel Marmorek",
+     "winner": false
+    }
+   },
+   "goals": {
+    "home": 3,
+    "away": 1
+   },
+   "score": {
+    "halftime": {
+     "home": 0,
+     "away": 1
+    },
+    "fulltime": {
+     "home": null,
+     "away": null
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1651254,
+    "referee": null,
+    "timezone": "UTC",
+    "date": "2026-11-26T08:30:00+00:00",
+    "timestamp": 1795681800,
+    "periods": {
+     "first": 1795681800,
+     "second": 1795685400
+    },
+    "venue": {
+     "id": 2581,
+     "name": "Lakeside Stadium",
+     "city": "South Melbourne"
+    },
+    "status": {
+     "long": "Match Finished",
+     "short": "PEN",
+     "elapsed": 120,
+     "extra": null
+    }
+   },
+   "league": {
+    "id": 1202,
+    "name": "Australian Championship",
+    "country": "Australia",
+    "season": 2026,
+    "round": "Quarter-finals",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 3811,
+     "name": "South Melbourne",
+     "winner": true
+    },
+    "away": {
+     "id": 3808,
+     "name": "Oakleigh Cannons",
+     "winner": false
+    }
+   },
+   "goals": {
+    "home": 3,
+    "away": 3
+   },
+   "score": {
+    "halftime": {
+     "home": 1,
+     "away": 2
+    },
+    "fulltime": {
+     "home": 3,
+     "away": 3
+    },
+    "extratime": {
+     "home": 0,
+     "away": 0
+    },
+    "penalty": {
+     "home": 4,
+     "away": 2
+    }
+   }
+  },
+  {
+   "fixture": {
+    "id": 1635338,
+    "referee": null,
+    "timezone": "UTC",
+    "date": "2026-11-26T13:00:00+00:00",
+    "timestamp": 1795698000,
+    "periods": {
+     "first": 1795698000,
+     "second": 1795701600
+    },
+    "venue": {
+     "id": null,
+     "name": "MTN Omondi Stadium",
+     "city": null
+    },
+    "status": {
+     "long": "Match Finished",
+     "short": "FT",
+     "elapsed": 90,
+     "extra": 7
+    }
+   },
+   "league": {
+    "id": 585,
+    "name": "Premier League",
+    "country": "Uganda",
+    "season": 2026,
+    "round": "Regular Season - 12",
+    "standings": true
+   },
+   "teams": {
+    "home": {
+     "id": 6422,
+     "name": "KCCA",
+     "winner": null
+    },
+    "away": {
+     "id": 12449,
+     "name": "BUL",
+     "winner": null
+    }
+   },
+   "goals": {
+    "home": 0,
+    "away": 0
+   },
+   "score": {
+    "halftime": {
+     "home": 0,
+     "away": 0
+    },
+    "fulltime": {
+     "home": 0,
+     "away": 0
+    },
+    "extratime": {
+     "home": null,
+     "away": null
+    },
+    "penalty": {
+     "home": null,
+     "away": null
+    }
+   }
+  }
+ ]
+}

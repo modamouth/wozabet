@@ -1,4 +1,5 @@
 import type { Db } from './db';
+import { staleSql } from './risk';
 
 export interface MatchDTO {
   id: string; sport: string; league: string; home: string; away: string; kickoff: string; status: string;
@@ -21,10 +22,11 @@ export async function listMatches(db: Db, opts: { sport?: string; live?: boolean
     where.push(`f.sport = $${params.length}`);
   }
   const rows = await db.q<any>(
-    `SELECT f.*, COALESCE(json_agg(json_build_object('selection', o.selection, 'priceMilli', o.price_milli, 'suspended', o.suspended))
+    `SELECT f.*, COALESCE(json_agg(json_build_object('selection', o.selection, 'priceMilli', o.price_milli, 'suspended', o.suspended OR ${staleSql('o')}))
               FILTER (WHERE o.selection IS NOT NULL), '[]'::json) AS odds
        FROM fixtures f LEFT JOIN odds o ON o.fixture_id = f.id
-      WHERE ${where.join(' AND ')} GROUP BY f.id ORDER BY f.kickoff LIMIT 200`,
+      WHERE ${where.join(' AND ')} GROUP BY f.id
+      ${opts.live ? '' : 'HAVING count(o.selection) > 0'} ORDER BY f.kickoff LIMIT 200`,
     params,
   );
   return rows.map((r: any) => ({

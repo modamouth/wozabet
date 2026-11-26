@@ -170,4 +170,5 @@ CREATE OR REPLACE FUNCTION audit_log_immutable() RETURNS trigger LANGUAGE plpgsq
 BEGIN RAISE EXCEPTION 'audit_log is append-only'; END $$;
 DROP TRIGGER IF EXISTS audit_log_no_change ON audit_log;
 CREATE TRIGGER audit_log_no_change BEFORE UPDATE OR DELETE ON audit_log FOR EACH ROW EXECUTE FUNCTION audit_log_immutable();
+ALTER TABLE odds ADD COLUMN IF NOT EXISTS source_updated_at timestamptz;
 `;

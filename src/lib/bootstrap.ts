@@ -10,8 +10,12 @@ export function ensureData(): Promise<void> {
   running ??= (async () => {
     try {
       const db = await getDb();
-      const n = await db.q<{ c: number }>("SELECT count(*)::int AS c FROM fixtures WHERE status='scheduled' AND kickoff > now()");
-      if (n[0].c === 0) await syncFixtures(db, defaultProviders(), todayAndTomorrow());
+      const n = await db.q<{ c: number; fresh: boolean }>(
+        `SELECT (SELECT count(*)::int FROM fixtures WHERE status='scheduled' AND kickoff > now()) AS c,
+                COALESCE((SELECT max(updated_at) FROM odds) > now() - make_interval(mins => $1), false) AS fresh`,
+        [Math.max(1, Math.floor(config.oddsMaxAgeMinutes / 2))]);
+      // the mock "feed" is local and free, so refresh it before its prices go stale
+      if (n[0].c === 0 || !n[0].fresh) await syncFixtures(db, defaultProviders(), todayAndTomorrow());
     } finally {
       running = null;
     }

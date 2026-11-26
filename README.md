@@ -36,11 +36,29 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 
 1. **Postgres**: set `DATABASE_URL` (tables are created automatically). Dev uses embedded Postgres (PGlite) in `./.data`.
 2. **Secrets**: set `AUTH_SECRET` and `CRON_SECRET` (the app refuses to start in production without `AUTH_SECRET`). Set `DEMO_MODE=false`.
-3. **Real odds**: set `API_FOOTBALL_KEY` (+ `API_FOOTBALL_LEAGUES`). Schedule `POST /api/cron/sync` every 5-10 min with header `Authorization: Bearer $CRON_SECRET`. The API-Football adapter was written from its public docs and is **not yet tested against the live API**; check it on the free plan first. Rugby/basketball only exist in the mock feed.
+3. **Real odds**: set `API_FOOTBALL_KEY` and `API_FOOTBALL_LEAGUES`, then schedule `POST /api/cron/sync` with the header `Authorization: Bearer $CRON_SECRET`. See [Odds feed](#odds-feed) for the plan you need and how often to sync. Rugby and basketball only exist in the mock feed.
 4. **Payments**: see [Payments](#payments) below. The mobile-wallet adapter's API details are assumptions until checked against your provider's merchant docs.
 5. **Compliance**: KYC and responsible-gambling tools are built (see below). Still to do: bonus wagering rules, audit/reporting for the Namibia Gambling Board, terms and privacy pages. Have your gambling lawyer review before taking real money.
 6. **Settlement**: keep `AUTO_SETTLE=false` at first (admin confirms results by hand); enable once you trust the feed.
 7. **Live betting** stays off (`LIVE_BETTING=false`): 30-60s feed delays are not safe for in-play prices.
+
+## Odds feed
+
+The adapter (`src/lib/providers/apiFootball.ts`) was **checked against the live API on 2026-11-26** (free plan). Recorded responses in `tests/fixtures/api-football/` drive the unit tests. `npm run check:api-football` shows your plan, quota and the real response shapes, and `npm run check:api-football:sync` runs a real sync into a throwaway database. `API_FOOTBALL_LIVE_TEST=1 npx vitest run tests/api-football.live.test.ts` is an opt-in live test.
+
+What the live check showed:
+- **Free plan: 100 requests a day and 10 a minute.** It refuses `league` + `season` filters for the current season (it returns HTTP 200 with `errors.plan`), so the adapter always queries by date and filters leagues itself.
+- **Every sync spends a request budget** (`API_FOOTBALL_MAX_REQUESTS_PER_SYNC`). That's one `/fixtures?date` call per date, then odds for the soonest matches in your leagues:
+  - With a small budget it makes one request per match.
+  - It only pages through `/odds?date` (about 11 pages on a busy day) when the budget covers all the pages.
+  - It stops early on the per-minute limit, on a 429, or when the daily quota drops to `API_FOOTBALL_MIN_DAILY_REMAINING`.
+- **The free plan is for testing only.** It allows roughly 10 syncs a day, which means most prices end up suspended as stale. Production needs a paid plan, with the budget raised and the cron set to every 5–10 minutes.
+- **Namibia Premier League** is in API-Football (league 409), but its latest season is 2018 with no odds. Namibian football needs another data source.
+- API league names are ambiguous ("Premier League" is England, Namibia, Uganda, Libya…), so `src/lib/leagues.ts` maps ids to display names. Leagues not in the map are shown as "Country Competition".
+
+**Stale-odds protection.** Prices go suspended when we haven't refreshed them for `ODDS_MAX_AGE_MINUTES` (the feed is down or sync isn't running), or when the provider hasn't changed them for `ODDS_MAX_SOURCE_AGE_MINUTES` (the feed is frozen upstream). The check runs in SQL both when matches are listed **and** when a bet is placed, so a stale price is never bettable even if no job has run. Each sync also writes the suspension to the database (recorded in the audit log as `odds.suspended_stale`), and fresh prices lift it.
+
+**Exposure limit.** `MAX_MARKET_LIABILITY_CENTS` caps the worst-case loss on one market across all players: the payout if a selection wins, minus single-bet stakes held on that market. Accumulator legs count their full potential return. A bet over the limit gets `market_limit`. Bets lock the fixture rows involved, so parallel bets can't slip past the limit together.
 
 ## Payments
 

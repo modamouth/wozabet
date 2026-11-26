@@ -9,7 +9,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "sandbox:webhook": "tsx --env-file=.env scripts/sandbox-webhook.ts"
+    "sandbox:webhook": "tsx --env-file=.env scripts/sandbox-webhook.ts",
+    "check:api-football": "tsx --env-file=.env scripts/check-api-football.ts",
+    "check:api-football:sync": "tsx --env-file=.env scripts/live-sync-check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1178.0",
