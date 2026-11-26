@@ -35,6 +35,9 @@ export default function Me() {
       <WalletPanel />
       <div className="menu" style={{ margin: '0 16px', borderTop: '1px solid var(--line)' }}>
         {u.role === 'admin' && <Link href="/admin">Admin: results &amp; settlement <span className="muted">›</span></Link>}
+        <Link href="/me/limits">Deposit &amp; loss limits, reminders <span className="muted">›</span></Link>
+        <Link href="/me/break">Take a break / self-exclude <span className="muted">›</span></Link>
+        <Link href="/responsible-gambling">Responsible gambling help <span className="muted">›</span></Link>
         <Link href="/me/verify">Verify identity <span className="muted">{u.kycStatus} ›</span></Link>
         {u.role === 'admin' && <Link href="/admin/kyc">Admin: identity checks <span className="muted">›</span></Link>}
         {u.role === 'admin' && <Link href="/admin/withdrawals">Admin: withdrawals <span className="muted">›</span></Link>}

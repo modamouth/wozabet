@@ -27,6 +27,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 | Odds/fixtures feed: API-Football + mock | `src/lib/providers/`, `sync.ts` |
 | Mobile-wallet deposits (initiate + HMAC-signed webhook), withdrawals with admin review | `src/lib/payments/`, `withdrawals.ts` |
 | KYC: ID number + document upload to private S3-compatible storage, admin review | `src/lib/kyc.ts`, `storage.ts` |
+| Responsible gambling: deposit/loss limits, session reminder, cool-off, self-exclusion (enforced server-side) | `src/lib/rg.ts` |
 | Accounts: phone + scrypt password, 18+ enforced server-side, signed cookie session | `src/lib/users.ts`, `auth.ts` |
 | UI (Home, Live, Bet slip, My bets, Me, Join/Login, Admin) | `src/app/` |
 
@@ -36,7 +37,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 2. **Secrets**: set `AUTH_SECRET` and `CRON_SECRET` (the app refuses to start in production without `AUTH_SECRET`). Set `DEMO_MODE=false`.
 3. **Real odds**: set `API_FOOTBALL_KEY` (+ `API_FOOTBALL_LEAGUES`). Schedule `POST /api/cron/sync` every 5-10 min with header `Authorization: Bearer $CRON_SECRET`. The API-Football adapter was written from its public docs and is **not yet tested against the live API**; check it on the free plan first. Rugby/basketball only exist in the mock feed.
 4. **Payments**: see [Payments](#payments) below. The mobile-wallet adapter's API details are assumptions until checked against your provider's merchant docs.
-5. **Compliance** (not built): KYC document verification, deposit/loss limits, self-exclusion UI, bonus wagering rules, audit/reporting for the Namibia Gambling Board, terms and privacy pages. Have your gambling lawyer review before taking real money.
+5. **Compliance**: KYC and responsible-gambling tools are built (see below). Still to do: bonus wagering rules, audit/reporting for the Namibia Gambling Board, terms and privacy pages. Have your gambling lawyer review before taking real money.
 6. **Settlement**: keep `AUTO_SETTLE=false` at first (admin confirms results by hand); enable once you trust the feed.
 7. **Live betting** stays off (`LIVE_BETTING=false`): 30-60s feed delays are not safe for in-play prices.
 
@@ -66,6 +67,21 @@ Players open **Me → Verify identity** and enter a Namibian ID number or passpo
 - An ID number can only be linked to one account. A rejection frees it again, in case someone used a stolen ID.
 - Files go to `KYC_STORAGE`: S3-compatible with server-side encryption, or a local folder that must be **outside** the project, written with 0600 permissions. They're never publicly reachable. Admins view them through `/api/admin/kyc/<id>/document`, which is admin-only and served with `no-store` and a locked-down CSP.
 - Status flow: `unverified → submitted → verified | rejected` (after a rejection the player can resubmit). Admins review under **Me → Admin: identity checks** and can't review their own documents. Withdrawals stay blocked until the status is `verified`.
+
+## Responsible gambling
+
+Players manage these under **Me → Deposit & loss limits** and **Me → Take a break**. All checks run on the server: `assertDepositAllowed` in deposit initiation, `assertStakeAllowed` in `placeBet`. Both run inside the transaction with the user row locked, so two parallel requests can't both slip under a limit.
+
+| Tool | Rule |
+|---|---|
+| Deposit limits (daily / weekly / monthly) | Rolling 24 h / 7 d / 30 d. Completed deposits **and pending payment requests** count towards the limit. |
+| Loss limit (daily / weekly / monthly) | Net loss = stakes − winnings − refunds in the window. Open bets count as lost. A stake is refused if losing it could break the limit. |
+| Changing limits | Lowering or adding a limit applies now. Raising or removing one applies after **24 h**. Every change is kept in `rg_limits`. |
+| Session reminder | Off / 15 / 30 / 60 / 120 min. Shows a "time check" dialog with Continue / Take a break / Log out. |
+| Cool-off | 24 h / 7 d / 30 d. Blocks bets and deposits. Can only be extended. |
+| Self-exclusion | 1 month / 6 months / permanent. Blocks bets and deposits. Can only be extended, never lifted early. |
+
+Players on a cool-off or self-exclusion can still log in and **withdraw** their balance. The help page is `/responsible-gambling`, and its helpline details are placeholders for your compliance team.
 
 ## Known limits of this MVP
 - Login throttling is in-memory (single server). Use Redis/DB if you scale out.

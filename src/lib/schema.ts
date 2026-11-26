@@ -119,4 +119,18 @@ CREATE TABLE IF NOT EXISTS kyc_submissions (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS kyc_status_idx ON kyc_submissions(status, created_at);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS self_excluded_permanent boolean NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cool_off_until timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_reminder_minutes integer;
+CREATE TABLE IF NOT EXISTS rg_limits (
+  id serial PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id),
+  kind text NOT NULL,
+  period text NOT NULL,
+  amount_cents integer,
+  effective_from timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rg_limits_user_idx ON rg_limits(user_id, kind, period, id DESC);
+CREATE INDEX IF NOT EXISTS ledger_user_type_time_idx ON ledger(user_id, type, created_at);
 `;

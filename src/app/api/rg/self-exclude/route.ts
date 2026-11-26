@@ -1,0 +1,16 @@
+import { z } from 'zod';
+import { handle, ok } from '@/lib/http';
+import { getDb } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
+import { AppError } from '@/lib/errors';
+import { selfExclude } from '@/lib/rg';
+
+const Body = z.object({ option: z.enum(['1m', '6m', 'permanent']), confirm: z.literal(true) });
+
+export async function POST(req: Request) {
+  return handle(async () => {
+    const u = await requireUser();
+    const b = Body.parse(await req.json().catch(() => { throw new AppError('invalid', 'Invalid request'); }));
+    return ok(await selfExclude(await getDb(), u.uid, b.option));
+  });
+}

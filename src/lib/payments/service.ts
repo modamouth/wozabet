@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
-import type { Db, Q } from '../db';
+import type { Db } from '../db';
 import { AppError } from '../errors';
 import { config } from '../config';
 import { formatNad } from '../money';
 import { depositInTx } from '../wallet';
+import { assertDepositAllowed } from '../rg';
 import type { PaymentEvent, PaymentProvider } from './types';
 
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'review';
@@ -18,7 +19,7 @@ const defaultLimits = (): DepositLimits => ({ minCents: config.minDepositCents, 
  */
 export async function initiateDeposit(
   db: Db, provider: PaymentProvider,
-  input: { userId: string; amountCents: number; callbackUrl: string; limits?: DepositLimits; checks?: (q: Q, userId: string, amountCents: number) => Promise<void> },
+  input: { userId: string; amountCents: number; callbackUrl: string; limits?: DepositLimits },
 ) {
   const { userId, amountCents } = input;
   const limits = input.limits ?? defaultLimits();
@@ -30,7 +31,8 @@ export async function initiateDeposit(
   const msisdn = await db.tx(async (q) => {
     const u = (await q<{ phone: string }>('SELECT phone FROM users WHERE id=$1 FOR UPDATE', [userId]))[0];
     if (!u) throw new AppError('no_user', 'User not found', 404);
-    if (input.checks) await input.checks(q, userId, amountCents);
+    // self-exclusion, cool-off and deposit limits (pending payments count towards the limit)
+    await assertDepositAllowed(q, userId, amountCents);
     const m = u.phone.replace(/^\+/, '');
     await q('INSERT INTO payments (id, user_id, provider, amount_cents, msisdn) VALUES ($1,$2,$3,$4,$5)', [id, userId, provider.name, amountCents, m]);
     return m;

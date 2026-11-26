@@ -4,6 +4,7 @@ import { AppError } from './errors';
 import { config } from './config';
 import { debit } from './wallet';
 import { potentialReturnCents, totalOddsMilli } from './odds';
+import { assertStakeAllowed } from './rg';
 
 export interface SelectionInput { fixtureId: string; selection: string; priceMilli: number }
 
@@ -22,11 +23,10 @@ export async function placeBet(db: Db, userId: string, input: { stakeCents: numb
   }
 
   return db.tx(async (q: Q) => {
-    const u = await q<{ self_excluded_until: Date | null }>('SELECT self_excluded_until FROM users WHERE id=$1', [userId]);
+    // lock the user row so concurrent bets can't both slip under a loss limit
+    const u = await q('SELECT 1 FROM users WHERE id=$1 FOR UPDATE', [userId]);
     if (!u[0]) throw new AppError('no_user', 'User not found', 404);
-    if (u[0].self_excluded_until && new Date(u[0].self_excluded_until) > new Date()) {
-      throw new AppError('self_excluded', 'Your account is self-excluded', 403);
-    }
+    await assertStakeAllowed(q, userId, stakeCents);
 
     const changed: SelectionInput[] = [];
     const unavailable: string[] = [];
