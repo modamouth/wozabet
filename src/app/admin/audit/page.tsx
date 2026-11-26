@@ -8,7 +8,7 @@ const FILTERS = ['', 'deposit', 'withdrawal', 'kyc', 'fixture', 'bet', 'rg', 'au
 
 export default function AdminAudit() {
   const { me } = useApp();
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState(() => (typeof window !== 'undefined' ? (new URLSearchParams(location.search).get('action') ?? '').replace(/\.$/, '') : ''));
   const [list, setList] = useState<E[] | null>(null);
   const [msg, setMsg] = useState('');
   const load = useCallback(() => api<{ entries: E[] }>(`/api/admin/audit${filter ? `?action=${filter}.` : ''}`).then((r) => setList(r.entries)).catch((e) => setMsg(e.message)), [filter]);

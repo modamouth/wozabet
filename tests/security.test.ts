@@ -163,3 +163,16 @@ describe('audit log', () => {
     expect((await listAudit(db.q)).length).toBe(before);
   });
 });
+
+describe('admin dashboard summary', () => {
+  it('counts what needs attention', async () => {
+    const { adminSummary } = await import('@/lib/admin');
+    const admin = await makeUser(db, { role: 'admin' });
+    const u = await makeUser(db, { kyc: 'verified' });
+    await credit(db.q, u.id, 50_000, 'deposit', 'd');
+    await withdrawWithOtp(db, u.id, 10_000);
+    const s = await adminSummary(db);
+    expect(s).toMatchObject({ withdrawalsPending: 1, withdrawalsPendingCents: 10_000, kycPending: 0, paymentsReview: 0, players: 1, openBets: 0 });
+    expect(admin.role).toBe('admin');
+  });
+});

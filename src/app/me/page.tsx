@@ -19,6 +19,7 @@ export default function Me() {
   return (
     <>
       <h2 className="title">Account</h2>
+      {u.role === 'admin' && <div style={{ padding: '8px 16px 0' }}><Link href="/admin" className="btn block">Open admin dashboard</Link></div>}
       <div className="card" style={{ margin: '12px 16px' }}>
         <div className="muted" style={{ fontSize: 12 }}>{u.firstName} {u.lastName} · {u.phone}</div>
         <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Balance</div>
@@ -34,7 +35,7 @@ export default function Me() {
       </div>
       <WalletPanel />
       <div className="menu" style={{ margin: '0 16px', borderTop: '1px solid var(--line)' }}>
-        {u.role === 'admin' && <Link href="/admin">Admin: results &amp; settlement <span className="muted">›</span></Link>}
+        {u.role === 'admin' && <Link href="/admin/results">Admin: results &amp; settlement <span className="muted">›</span></Link>}
         <Link href="/me/limits">Deposit &amp; loss limits, reminders <span className="muted">›</span></Link>
         <Link href="/me/break">Take a break / self-exclude <span className="muted">›</span></Link>
         <Link href="/responsible-gambling">Responsible gambling help <span className="muted">›</span></Link>

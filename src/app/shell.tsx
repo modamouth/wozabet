@@ -26,11 +26,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <Link href="/live" className={cls('/live')}>Live</Link>
           <Link href="/bets" className={cls('/bets')}>My bets</Link>
           <Link href="/responsible-gambling" className={cls('/responsible-gambling')}>Responsible gambling</Link>
+          {me?.user && <Link href="/me" className={cls('/me')}>Account</Link>}
+          {me?.user?.role === 'admin' && <Link href="/admin" className={cls('/admin')}>Admin</Link>}
         </nav>
         <div className="hbtns">
           <button className="btn ghost slip-desk" onClick={() => setSlipOpen(true)}>Bet slip{n > 0 && <span className="badge-inline">{n}</span>}</button>
           {me?.user ? (
-            <Link href="/me" className="bal">{formatNad(me.user.balanceCents)}</Link>
+            <Link href="/me" className="bal" aria-label={`Account, balance ${formatNad(me.user.balanceCents)}`}>{formatNad(me.user.balanceCents)}</Link>
           ) : me ? (
             <>
               <Link href="/login" className="btn ghost">Log in</Link>
