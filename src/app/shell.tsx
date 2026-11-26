@@ -5,6 +5,7 @@ import { useApp } from './store';
 import { formatNad } from '@/lib/money';
 import BetSlip from './betslip';
 import SessionReminder from './session-reminder';
+import Footer from './footer';
 
 const I = ({ d }: { d: string }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
@@ -20,7 +21,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <header className="header">
         <Link href="/" aria-label="Wozabet home"><img src="/logo.png" alt="WozaBet – Come win big!" /></Link>
+        <nav className="hnav" aria-label="Main">
+          <Link href="/" className={cls('/')}>Sports</Link>
+          <Link href="/live" className={cls('/live')}>Live</Link>
+          <Link href="/bets" className={cls('/bets')}>My bets</Link>
+          <Link href="/responsible-gambling" className={cls('/responsible-gambling')}>Responsible gambling</Link>
+        </nav>
         <div className="hbtns">
+          <button className="btn ghost slip-desk" onClick={() => setSlipOpen(true)}>Bet slip{n > 0 && <span className="badge-inline">{n}</span>}</button>
           {me?.user ? (
             <Link href="/me" className="bal">{formatNad(me.user.balanceCents)}</Link>
           ) : me ? (
@@ -32,8 +40,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="main">{children}</main>
+      <Footer />
       {!authPage && (
-        <nav className="nav" aria-label="Main">
+        <nav className="nav" aria-label="Main (mobile)">
           <Link href="/" className={cls('/')}><I d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />Home</Link>
           <Link href="/live" className={cls('/live')}><I d="M12 9.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 0 0 0-5zM6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4" />Live</Link>
           <button className="slipbtn" onClick={() => setSlipOpen(true)}>

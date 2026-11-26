@@ -68,7 +68,7 @@ export default function Join() {
         {step === 3 && (<>
           <h2 style={{ fontSize: 22 }}>Almost there</h2>
           <label className="check"><input type="checkbox" checked={f.a18} onChange={set('a18')} /><span>I am 18 years or older and a resident of Namibia.</span></label>
-          <label className="check"><input type="checkbox" checked={f.tc} onChange={set('tc')} /><span>I accept the Terms &amp; Conditions and Privacy Policy.</span></label>
+          <label className="check"><input type="checkbox" checked={f.tc} onChange={set('tc')} /><span>I accept the <Link href="/terms" target="_blank" className="green">Terms &amp; Conditions</Link> and <Link href="/privacy" target="_blank" className="green">Privacy Policy</Link>.</span></label>
           <p className="muted" style={{ fontSize: 12, border: '1px solid #333', borderRadius: 10, padding: 12 }}>Gamble responsibly. You can set limits or self-exclude from your account at any time.</p>
         </>)}
         {step === 4 && (<>

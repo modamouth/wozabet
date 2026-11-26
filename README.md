@@ -32,7 +32,7 @@ With `DEMO_MODE=true` the Me page has play-money top-ups.
 | Responsible gambling: deposit/loss limits, session reminder, cool-off, self-exclusion (enforced server-side) | `src/lib/rg.ts` |
 | Security: SMS OTP (sign-up, withdrawals), DB rate limits, CSRF, append-only audit log | `src/lib/otp.ts`, `ratelimit.ts`, `csrf.ts`, `proxy.ts`, `audit.ts` |
 | Accounts: phone + scrypt password, 18+ enforced server-side, signed cookie session | `src/lib/users.ts`, `auth.ts` |
-| UI (Home, Live, Bet slip, My bets, Me, Join/Login, Admin) | `src/app/` |
+| UI: mobile app + desktop landing (≥1024px: hero, top sports, promotions, payment methods, app banner), site-wide 18+ footer | `src/app/` (`landing.tsx`, `footer.tsx`) |
 
 ## Going live checklist
 
@@ -61,6 +61,16 @@ What the live check showed:
 **Stale-odds protection.** Prices go suspended when we haven't refreshed them for `ODDS_MAX_AGE_MINUTES` (the feed is down or sync isn't running), or when the provider hasn't changed them for `ODDS_MAX_SOURCE_AGE_MINUTES` (the feed is frozen upstream). The check runs in SQL both when matches are listed **and** when a bet is placed, so a stale price is never bettable even if no job has run. Each sync also writes the suspension to the database (recorded in the audit log as `odds.suspended_stale`), and fresh prices lift it.
 
 **Exposure limit.** `MAX_MARKET_LIABILITY_CENTS` caps the worst-case loss on one market across all players: the payout if a selection wins, minus single-bet stakes held on that market. Accumulator legs count their full potential return. A bet over the limit gets `market_limit`. Bets lock the fixture rows involved, so parallel bets can't slip past the limit together.
+
+## Compliance in the UI
+
+- **18+ and responsible gambling** are visible on every page through the footer: 18+ badge, addiction warning, and links to limits, breaks and the help page. The bet slip and the sign-up form also carry 18+ text.
+- **Terms** (`/terms`) and **Privacy** (`/privacy`) are placeholders with section headings only, clearly marked as drafts. Your lawyer supplies the text. The licence number in the footer and the helplines on `/responsible-gambling` are placeholders too.
+- **No misleading claims.**
+  - The landing page only states what is true today. Promotions says no offer is running, and promises that full terms (minimum deposit, wagering requirement, eligible bets, expiry) appear before anyone opts in.
+  - Payment methods shows "Launching soon" until `PAYMENTS_PROVIDER` is set, and no wallet or bank brand logos until those are contracted.
+  - The app banner explains adding the web app to the home screen. It doesn't show app-store badges.
+  - Rugby and basketball are labelled "Coming later".
 
 ## Markets
 
